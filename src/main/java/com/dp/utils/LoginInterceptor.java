@@ -12,11 +12,7 @@ import cn.hutool.core.util.StrUtil;
 public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        // Allow RabbitMQ test endpoints
-        String uri = request.getRequestURI();
-        if (uri.startsWith("/mq/")) {
-            return true;
-        }
+        
         
         // Existing authentication logic
         String token = request.getHeader("authorization");
