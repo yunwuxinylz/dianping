@@ -1,0 +1,3 @@
+@host = http://localhost:8080
+
+@token = addf78f6de9d4c7aa34658f122f4e0f1

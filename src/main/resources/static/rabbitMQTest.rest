@@ -1,0 +1,19 @@
+### RabbitMQ API 测试组 ###
+@mq_host = http://localhost:8080/api
+### 1. Direct交换机测试
+GET {{mq_host}}/mq/direct?message=你好，这是Direct消息测试
+Accept: application/json
+Content-Type: application/json
+
+### 2. Topic交换机测试
+GET {{mq_host}}/mq/topic?message=测试Topic消息&routingKey=dp.topic.message
+Accept: application/json
+Content-Type: application/json
+
+### 3. Fanout交换机测试
+GET {{mq_host}}/mq/fanout?message=%E6%B5%8B%E8%AF%95Fanout%E6%B6%88%E6%81%AF
+Content-Type: application/json
+
+### 4. Headers交换机测试
+GET {{mq_host}}/mq/headers?message=%E6%B5%8B%E8%AF%95Headers%E6%B6%88%E6%81%AF
+Content-Type: application/json
