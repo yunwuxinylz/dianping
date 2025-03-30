@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import javax.annotation.Resource;
 
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,8 @@ import com.dp.utils.UserHolder;
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder>
         implements IVoucherOrderService {
 
+    @Resource
+    private RedissonClient redissonClient;
     @Resource
     private RedisIdWorker redisIdWorker;
 
@@ -67,8 +71,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         Long userId = UserHolder.getUser().getId();
 
-        ILock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
-        boolean isLock = lock.tryLock(1200);
+        // ILock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        boolean isLock = lock.tryLock();
         if (!isLock) {
             return Result.fail("不允许重复下单");
         }

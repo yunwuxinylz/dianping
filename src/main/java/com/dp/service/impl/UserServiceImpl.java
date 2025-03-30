@@ -107,7 +107,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 保存用户id到token的映射
         stringRedisTemplate.opsForValue().set(LOGIN_USER_ID_KEY + userId, token, LOGIN_USER_TTL, TimeUnit.HOURS);
         //设置token有效期
-        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.HOURS);
+        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
         
         return Result.ok(token);
     }

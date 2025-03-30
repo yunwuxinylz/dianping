@@ -1,3 +1,9 @@
 @host = http://localhost:8080
 
-@token = addf78f6de9d4c7aa34658f122f4e0f1
+@token1 = 8d820f93687140a19bd9d20aee9a6dd2
+@token2 = 6b1ad25cb97a405988a84dd8edbb3f0e
+
+
+
+POST {{host}}/api/voucher-order/seckill/11
+Authorization: {{token2}}
