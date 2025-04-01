@@ -1,6 +1,6 @@
 package com.dp.utils;
 
-import static com.dp.utils.RedisConstants.LOGIN_USER_TTL;
+import static com.dp.utils.RedisConstants.*;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -46,9 +46,11 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
         //存在，保存用户信息到hreadLocal
         UserHolder.saveUser(userDTO);
+        Long userId = userDTO.getId();
 
         //刷新token有效期
         stringRedisTemplate.expire(key, LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(LOGIN_USER_ID_KEY + userId, LOGIN_USER_TTL, TimeUnit.MINUTES);
         //放行
         return true;
     }

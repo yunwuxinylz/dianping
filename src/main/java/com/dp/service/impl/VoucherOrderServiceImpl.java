@@ -16,7 +16,6 @@ import com.dp.dto.Result;
 import com.dp.entity.SeckillVoucher;
 import com.dp.entity.VoucherOrder;
 import com.dp.mapper.VoucherOrderMapper;
-import com.dp.service.ILock;
 import com.dp.service.ISeckillVoucherService;
 import com.dp.service.IVoucherOrderService;
 import com.dp.utils.RedisIdWorker;
