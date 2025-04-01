@@ -1,6 +1,5 @@
 package com.dp.service.impl;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -21,13 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.Result;
-import com.dp.entity.SeckillVoucher;
 import com.dp.entity.VoucherOrder;
 import com.dp.mapper.VoucherOrderMapper;
 import com.dp.service.ISeckillVoucherService;
 import com.dp.service.IVoucherOrderService;
 import com.dp.utils.RedisIdWorker;
 import com.dp.utils.UserHolder;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * <p>
@@ -36,6 +36,7 @@ import com.dp.utils.UserHolder;
  *
  * @since 2021-12-22
  */
+@Slf4j
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder>
         implements IVoucherOrderService {
@@ -51,8 +52,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
-
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
     static {
         SECKILL_SCRIPT = new DefaultRedisScript<>();
@@ -61,6 +60,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
+    private IVoucherOrderService proxy;
+    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
 
     // 在构造方法或@PostConstruct方法中启动异步线程
     @PostConstruct
@@ -95,8 +96,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return;
         }
         try {
-            // 获取代理对象
-            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+
             proxy.createVoucherOrder(voucherOrder);
         } finally {
             lock.unlock();
@@ -130,6 +130,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setVoucherId(voucherId);
 
         orderTasks.add(voucherOrder);
+
+        // 获取代理对象
+        proxy = (IVoucherOrderService) AopContext.currentProxy();
 
         return Result.ok(orderId);
 

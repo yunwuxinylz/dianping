@@ -13,6 +13,11 @@ local orderKey = 'seckill:order:' .. vocherId
 -- 获取库存数量
 local stock = redis.call('get', stockKey)
 
+-- 判断库存是否存在
+if not stock then
+    return 1
+end
+
 -- 判断库存是否充足
 if (tonumber(stock) <= 0) then
     -- 库存不足，返回1

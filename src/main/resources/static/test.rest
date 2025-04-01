@@ -1,9 +1,26 @@
 @host = http://localhost:8080
 
 @token1 = 8d820f93687140a19bd9d20aee9a6dd2
-@token2 = 6b1ad25cb97a405988a84dd8edbb3f0e
+@token2 = e6232def9e294d26a92c923bac0ef493
 
 
 
 POST {{host}}/api/voucher-order/seckill/11
 Authorization: {{token2}}
+
+#### 秒杀下单
+POST {{host}}/api/voucher/seckill
+Content-Type: application/json
+
+{
+    "shopId": 3,
+    "title": "100元代金券",
+    "subTitle": "周一至周五均可使用",
+    "rules": "全场通用\\n无需预约\\n可无限叠加\\不兑现\\不找零",
+    "payValue": 8000,
+    "actualValue": 10000,
+    "type": 1,
+    "stock": 100,
+    "beginTime": "2025-03-20T10:00:00",
+    "endTime": "2025-04-20T10:00:00"
+}
