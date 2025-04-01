@@ -8,7 +8,7 @@ spring:
     port: 5672
     username: ylz
     password: ylz021129
-    virtual-host: /
+    virtual-host: /test
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://47.122.134.229:3306/dp?useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true

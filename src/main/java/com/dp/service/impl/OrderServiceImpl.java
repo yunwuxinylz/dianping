@@ -1,14 +1,17 @@
 package com.dp.service.impl;
 
-
 import java.time.LocalDateTime;
 
+import javax.annotation.Resource;
+
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.dp.config.RabbitMQConfig;
 import com.dp.dto.OrderCreateDTO;
 import com.dp.dto.OrderDTO;
 import com.dp.dto.UserDTO;
@@ -21,14 +24,17 @@ import com.dp.utils.SystemConstants;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
-
+import lombok.extern.slf4j.Slf4j;
 
 // 订单Service实现
 @Service
+@Slf4j
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
     @Autowired
     private IGoodsService goodsService;
-    
+
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     @Override
     @Transactional
@@ -36,18 +42,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 获取用户信息
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
-        
+
         // 查询商品
         Goods goods = goodsService.getById(orderCreateDTO.getGoodsId());
         if (goods == null) {
             throw new RuntimeException("商品不存在");
         }
-        
+
         // 检查库存
         if (goods.getStock() < orderCreateDTO.getAmount()) {
             throw new RuntimeException("库存不足");
         }
-        
+
         // 扣减库存
         boolean success = goodsService.update()
                 .setSql("stock = stock - " + orderCreateDTO.getAmount())
@@ -58,7 +64,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (!success) {
             throw new RuntimeException("库存不足");
         }
-        
+
         // 创建订单
         Order order = new Order();
 
@@ -70,10 +76,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setAmount(orderCreateDTO.getAmount());
         order.setTotalPrice(goods.getPrice() * orderCreateDTO.getAmount());
         order.setStatus(1); // 未支付
-        
+
         // 保存订单
         this.save(order);
-        
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.ORDER_EXCHANGE, RabbitMQConfig.ORDER_DELAY_ROUTING_KEY,
+                order.getId().toString());
+
         return order.getId();
     }
 
@@ -83,23 +92,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 获取用户信息
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
-//
-//        // 查询订单
+        //
+        // // 查询订单
         Order order = getById(orderId);
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }
-//
+        //
         // 校验订单归属
         if (!order.getUserId().equals(userId)) {
             throw new RuntimeException("订单不属于当前用户");
         }
-        
+
         // 校验订单状态
         if (order.getStatus() != 1) {
             throw new RuntimeException("订单状态异常");
         }
-        
+
         // 模拟支付，实际项目中应该调用支付接口
         // 更新订单状态
         boolean success = update()
@@ -109,7 +118,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq("id", orderId)
                 .eq("status", 1) // 未支付
                 .update();
-        
+
         return success;
     }
 
@@ -118,18 +127,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 获取用户信息
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
-        
+
         // 查询订单
         Order order = getById(orderId);
         if (order == null) {
             return null;
         }
-        
+
         // 校验订单归属
         if (!order.getUserId().equals(userId)) {
             throw new RuntimeException("订单不属于当前用户");
         }
-        
+
         // 转换为DTO
         return BeanUtil.copyProperties(order, OrderDTO.class);
     }
@@ -142,5 +151,38 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return this.query()
                 .eq("user_id", userId)
                 .page(new Page<>(1, SystemConstants.DEFAULT_PAGE_SIZE));
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        Order order = getById(orderId);
+
+        if (order == null) {
+            log.info("订单未找到");
+            return;
+        }
+
+        if (order.getStatus() != 1) {
+            log.info("订单已支付，订单号：{}", orderId);
+            return;
+        }
+
+        // 修改订单状态
+        boolean success = update()
+                .set("status", 4) // 已取消
+                .eq("id", orderId)
+                .eq("status", 1) // 未支付
+                .update();
+
+        if (success) {
+            // 恢复库存
+            goodsService.update()
+                    .setSql("stock = stock + " + order.getAmount())
+                    .setSql("sold = sold - " + order.getAmount())
+                    .eq("id", order.getGoodsId())
+                    .update();
+        }
+        log.info("订单{}超时已取消", orderId);
     }
 }

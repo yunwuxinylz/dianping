@@ -31,7 +31,6 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         
-        <!-- RabbitMQ依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
