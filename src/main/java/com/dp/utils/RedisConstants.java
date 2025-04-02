@@ -21,5 +21,9 @@ public class RedisConstants {
     public static final String LOGIN_USER_ID_KEY = "login:userid:";
 
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
+
+    public static final String ORDER_STATUS = "order:status:";
+    public static final Long ORDER_STATUS_TTL = 35L;
+
     
 }

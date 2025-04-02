@@ -1,17 +1,22 @@
 package com.dp.service.impl;
 
+import static com.dp.config.RabbitMQConfig.ORDER_CANCEL_ROUTING_KEY;
+import static com.dp.config.RabbitMQConfig.ORDER_EXCHANGE;
+import static com.dp.config.RabbitMQConfig.QUEUE_TTL;
+
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Resource;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.dp.config.RabbitMQConfig;
 import com.dp.dto.OrderCreateDTO;
 import com.dp.dto.OrderDTO;
 import com.dp.dto.UserDTO;
@@ -20,6 +25,7 @@ import com.dp.entity.Order;
 import com.dp.mapper.OrderMapper;
 import com.dp.service.IGoodsService;
 import com.dp.service.IOrderService;
+import com.dp.utils.RedisConstants;
 import com.dp.utils.SystemConstants;
 import com.dp.utils.UserHolder;
 
@@ -35,6 +41,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Resource
     private RabbitTemplate rabbitTemplate;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     @Transactional
@@ -79,9 +88,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         // 保存订单
         this.save(order);
+        stringRedisTemplate.opsForValue().set(RedisConstants.ORDER_STATUS + order.getId(),
+                order.getStatus().toString(), RedisConstants.ORDER_STATUS_TTL, TimeUnit.MINUTES);
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ORDER_EXCHANGE, RabbitMQConfig.ORDER_DELAY_ROUTING_KEY,
-                order.getId().toString());
+        rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_CANCEL_ROUTING_KEY, 
+                String.valueOf(order.getId()), message -> {
+                message.getMessageProperties().setDelay(QUEUE_TTL);
+                message.getMessageProperties().setHeader("retry-count", 0);
+                return message;
+            });
 
         return order.getId();
     }
@@ -119,6 +134,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq("status", 1) // 未支付
                 .update();
 
+        if (success) {
+            stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
+        }
         return success;
     }
 
@@ -150,24 +168,19 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 根据类型分页查询
         return this.query()
                 .eq("user_id", userId)
-                .page(new Page<>(1, SystemConstants.DEFAULT_PAGE_SIZE));
+                .page(new Page<>(2, SystemConstants.DEFAULT_PAGE_SIZE));
     }
 
     @Override
     @Transactional
     public void cancelOrder(Long orderId) {
+        String status = stringRedisTemplate.opsForValue().get(RedisConstants.ORDER_STATUS + orderId);
+        if (status == null) {
+            log.info("订单{}不存在或已支付", orderId);
+            return;
+        }
+
         Order order = getById(orderId);
-
-        if (order == null) {
-            log.info("订单未找到");
-            return;
-        }
-
-        if (order.getStatus() != 1) {
-            log.info("订单已支付，订单号：{}", orderId);
-            return;
-        }
-
         // 修改订单状态
         boolean success = update()
                 .set("status", 4) // 已取消
@@ -177,12 +190,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         if (success) {
             // 恢复库存
-            goodsService.update()
+            boolean update = goodsService.update()
                     .setSql("stock = stock + " + order.getAmount())
                     .setSql("sold = sold - " + order.getAmount())
                     .eq("id", order.getGoodsId())
+                    .ge("sold", order.getAmount())
                     .update();
+
+            if (update) {
+
+                stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
+                log.info("订单{}超时已取消", orderId);
+            }
         }
-        log.info("订单{}超时已取消", orderId);
     }
 }
