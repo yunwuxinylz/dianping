@@ -6,11 +6,10 @@ import java.util.Map;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.CustomExchange;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-
 
 @Configuration
 public class RabbitMQConfig {
@@ -19,6 +18,9 @@ public class RabbitMQConfig {
     public static final String ORDER_CANCEL_ROUTING_KEY = "order.cancel";
     public static final Integer QUEUE_TTL = 3 * 60 * 1000;
 
+    public static final String SECKILL_QUEUE = "seckill.queue";
+    public static final String SECKILL_EXCHANGE = "seckill.exchange";
+    public static final String SECKILL_ROUTING_KEY = "sckill.create.key";
 
     // 只需要一个取消订单队列
     @Bean
@@ -41,5 +43,26 @@ public class RabbitMQConfig {
                 .to(orderExchange())
                 .with(ORDER_CANCEL_ROUTING_KEY)
                 .noargs();
+    }
+
+    // 秒杀队列
+
+    @Bean
+    public Queue seckillQueue() {
+        return new Queue(SECKILL_QUEUE);
+    }
+
+    @Bean
+    public DirectExchange seckillExchange() {
+        return new DirectExchange(SECKILL_EXCHANGE, true, false);
+
+    }
+
+    @Bean
+    public Binding seckillBinding() {
+        return BindingBuilder.bind(seckillQueue())
+                .to(seckillExchange())
+                .with(SECKILL_ROUTING_KEY);
+
     }
 }
