@@ -17,3 +17,93 @@ Content-Type: application/json
 ### 4. Headers交换机测试
 GET {{mq_host}}/mq/headers?message=%E6%B5%8B%E8%AF%95Headers%E6%B6%88%E6%81%AF
 Content-Type: application/json
+
+###
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}
+
+POST {{mq_host}}/order/create
+Authorization: eb540287691842a3907580b72f5c4f37
+Content-Type: application/json
+
+{
+    "amount": 2,
+    "shopId": 1,
+    "goodsId": 1
+
+}

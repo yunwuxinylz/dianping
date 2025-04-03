@@ -168,7 +168,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 根据类型分页查询
         return this.query()
                 .eq("user_id", userId)
-                .page(new Page<>(2, SystemConstants.DEFAULT_PAGE_SIZE));
+                .page(new Page<>(1, SystemConstants.DEFAULT_PAGE_SIZE));
     }
 
     @Override
