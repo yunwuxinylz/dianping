@@ -1,5 +1,8 @@
 package com.dp.service.impl;
 
+import static com.dp.config.RabbitMQConfig.SECKILL_EXCHANGE;
+import static com.dp.config.RabbitMQConfig.SECKILL_ROUTING_KEY;
+
 import java.util.Collections;
 
 import javax.annotation.Resource;
@@ -13,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.dp.config.RabbitMQConfig;
 import com.dp.dto.Result;
 import com.dp.entity.VoucherOrder;
 import com.dp.mapper.VoucherOrderMapper;
@@ -23,9 +25,6 @@ import com.dp.utils.RedisIdWorker;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.json.JSONUtil;
-
-import static com.dp.config.RabbitMQConfig.*;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -60,8 +59,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         SECKILL_SCRIPT.setLocation(new ClassPathResource("seckill.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
     }
-
-    private IVoucherOrderService proxy;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
