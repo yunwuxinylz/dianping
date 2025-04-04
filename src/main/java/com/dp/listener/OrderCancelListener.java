@@ -35,7 +35,7 @@ public class OrderCancelListener {
     public void handleOrderCancel(Message message, Channel channel) {
         String orderId = null;
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
-        
+
         try {
             orderId = new String(message.getBody(), StandardCharsets.UTF_8);
             Integer retryCount = message.getMessageProperties().getHeader("retry-count");
@@ -48,8 +48,8 @@ public class OrderCancelListener {
                 log.info("订单{}不存在或已支付", orderId);
                 channel.basicAck(deliveryTag, false);
                 return;
-            } 
-            
+            }
+
             if (retryCount < 10) {
                 // 重新发送消息，设置新的延迟时间
                 log.info("第{}次重试", retryCount + 1);
@@ -58,14 +58,13 @@ public class OrderCancelListener {
                 Message newMessage = new Message(message.getBody(), props);
 
                 rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.ORDER_EXCHANGE,
-                    RabbitMQConfig.ORDER_CANCEL_ROUTING_KEY,
-                    newMessage,
-                    msg -> {
-                        msg.getMessageProperties().setDelay(RabbitMQConfig.QUEUE_TTL);
-                        return msg;
-                    }
-                );
+                        RabbitMQConfig.ORDER_EXCHANGE,
+                        RabbitMQConfig.ORDER_CANCEL_ROUTING_KEY,
+                        newMessage,
+                        msg -> {
+                            msg.getMessageProperties().setDelay(RabbitMQConfig.QUEUE_TTL);
+                            return msg;
+                        });
                 channel.basicAck(deliveryTag, false);
             } else {
                 log.info("订单{}已重试{}次，执行取消", orderId, retryCount);
