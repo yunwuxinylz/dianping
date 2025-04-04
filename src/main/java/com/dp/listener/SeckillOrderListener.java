@@ -2,8 +2,6 @@ package com.dp.listener;
 
 import java.io.IOException;
 
-import javax.annotation.Resource;
-
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
