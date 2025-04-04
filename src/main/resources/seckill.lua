@@ -1,14 +1,14 @@
 -- 接收优惠券id参数
-local vocherId = ARGV[1]
+local voucherId = ARGV[1]
 
 -- 接收用户id参数
 local userId = ARGV[2]
 
 -- 构建库存的key
-local stockKey = 'seckill:stock:' .. vocherId
+local stockKey = 'seckill:stock:' .. voucherId
 
 -- 构建订单的key
-local orderKey = 'seckill:order:' .. vocherId
+local orderKey = 'seckill:order:' .. voucherId
 
 -- 获取库存数量
 local stock = redis.call('get', stockKey)

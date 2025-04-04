@@ -6,6 +6,7 @@ import javax.annotation.Resource;
 
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.dp.config.RabbitMQConfig;
@@ -13,17 +14,19 @@ import com.dp.entity.VoucherOrder;
 import com.dp.service.IVoucherOrderService;
 import com.rabbitmq.client.Channel;
 
+import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
 public class SeckillOrderListener {
 
-    @Resource
+    @Autowired
     private IVoucherOrderService voucherOrderService;
 
     @RabbitListener(queues = RabbitMQConfig.SECKILL_QUEUE, ackMode = "MANUAL")
-    public void listenSeckillOrder(VoucherOrder voucherOrder, Message message, Channel channel) {
+    public void listenSeckillOrder(Message message, Channel channel) {
+        VoucherOrder voucherOrder = JSONUtil.toBean(new String(message.getBody()), VoucherOrder.class);
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
         
         try {

@@ -5,7 +5,6 @@ import static com.dp.config.RabbitMQConfig.ORDER_EXCHANGE;
 import static com.dp.config.RabbitMQConfig.QUEUE_TTL;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Resource;
 
@@ -89,14 +88,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 保存订单
         this.save(order);
         stringRedisTemplate.opsForValue().set(RedisConstants.ORDER_STATUS + order.getId(),
-                order.getStatus().toString(), RedisConstants.ORDER_STATUS_TTL, TimeUnit.MINUTES);
+                order.getStatus().toString());
 
-        rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_CANCEL_ROUTING_KEY, 
+        rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_CANCEL_ROUTING_KEY,
                 String.valueOf(order.getId()), message -> {
-                message.getMessageProperties().setDelay(QUEUE_TTL);
-                message.getMessageProperties().setHeader("retry-count", 0);
-                return message;
-            });
+                    message.getMessageProperties().setDelay(QUEUE_TTL);
+                    message.getMessageProperties().setHeader("retry-count", 0);
+                    return message;
+                });
 
         return order.getId();
     }

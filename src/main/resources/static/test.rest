@@ -1,12 +1,11 @@
 @host = http://localhost:8080
 
-@token1 = 8d820f93687140a19bd9d20aee9a6dd2
-@token2 = e6232def9e294d26a92c923bac0ef493
+@token = 8d820f93687140a19bd9d20aee9a6dd2
 
 
 
 POST {{host}}/api/voucher-order/seckill/11
-Authorization: {{token2}}
+Authorization: {{token}}
 
 #### 秒杀下单
 POST {{host}}/api/voucher/seckill
