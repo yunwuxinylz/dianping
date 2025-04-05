@@ -16,7 +16,8 @@ public class RabbitMQConfig {
     public static final String ORDER_EXCHANGE = "order.exchange";
     public static final String ORDER_CANCEL_QUEUE = "order.cancel.queue";
     public static final String ORDER_CANCEL_ROUTING_KEY = "order.cancel";
-    public static final Integer QUEUE_TTL = 3 * 60 * 1000;
+    public static final Integer[] QUEUE_TTL = { 10 * 1000, 40 * 1000, 70 * 1000, 3 * 60 * 1000, 5 * 60 * 1000,
+            10 * 60 * 1000, 15 * 60 * 1000 };
 
     public static final String SECKILL_QUEUE = "seckill.queue";
     public static final String SECKILL_EXCHANGE = "seckill.exchange";

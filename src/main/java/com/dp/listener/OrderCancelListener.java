@@ -40,6 +40,7 @@ public class OrderCancelListener {
             orderId = new String(message.getBody(), StandardCharsets.UTF_8);
             Integer retryCount = message.getMessageProperties().getHeader("retry-count");
             retryCount = retryCount == null ? 0 : retryCount;
+            final Integer finalRetryCount = retryCount;
 
             log.info("接收到订单取消消息：{}", orderId);
             String status = stringRedisTemplate.opsForValue().get(RedisConstants.ORDER_STATUS + orderId);
@@ -50,7 +51,7 @@ public class OrderCancelListener {
                 return;
             }
 
-            if (retryCount < 10) {
+            if (retryCount < RabbitMQConfig.QUEUE_TTL.length) {
                 // 重新发送消息，设置新的延迟时间
                 log.info("第{}次重试", retryCount + 1);
                 MessageProperties props = message.getMessageProperties();
@@ -62,7 +63,7 @@ public class OrderCancelListener {
                         RabbitMQConfig.ORDER_CANCEL_ROUTING_KEY,
                         newMessage,
                         msg -> {
-                            msg.getMessageProperties().setDelay(RabbitMQConfig.QUEUE_TTL);
+                            msg.getMessageProperties().setDelay(RabbitMQConfig.QUEUE_TTL[finalRetryCount]);
                             return msg;
                         });
                 channel.basicAck(deliveryTag, false);
