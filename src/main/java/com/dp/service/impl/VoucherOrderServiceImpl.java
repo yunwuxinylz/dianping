@@ -143,25 +143,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Override
     @Transactional
     public void createVoucherOrder(VoucherOrder voucherOrder) {
-        // 一人一单
-        Long userId = voucherOrder.getUserId();
-        Long count = query().eq("user_id", userId).eq("voucher_id", voucherOrder.getVoucherId()).count();
-        if (count > 0) {
-            // 用户已经购买过一次
-            log.error("用户已经买过了");
-            return;
-        }
 
         // 5.1.5.扣减库存
-        boolean success = seckillVoucherService.update()
+        seckillVoucherService.update()
                 .setSql("stock = stock - 1")
-                .eq("voucher_id", voucherOrder.getVoucherId()).gt("stock", 0).update();
-
-        if (!success) {
-            // 扣减失败
-            log.error("库存不足");
-            return;
-        }
+                .eq("voucher_id", voucherOrder.getVoucherId())
+                .gt("stock", 0).update();
 
         save(voucherOrder);
 
