@@ -52,6 +52,8 @@ public class OrderCancelListener {
             }
 
             if (retryCount < RabbitMQConfig.QUEUE_TTL.length) {
+                log.info("订单{}未支付", orderId);
+
                 // 重新发送消息，设置新的延迟时间
                 log.info("第{}次重试", retryCount + 1);
                 MessageProperties props = message.getMessageProperties();
