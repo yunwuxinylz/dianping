@@ -11,8 +11,8 @@ spring:
     virtual-host: /
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.11.20:3306/dp?useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true
-    username: dp
+    url: jdbc:mysql://localhost:3306/dp?useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true
+    username: root
     password: 021129
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
@@ -46,7 +46,6 @@ spring:
       connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
   redis:
     client-name: dp-redis
-    # host: 47.122.134.229
     host: 192.168.11.20
     port: 6379
     password: ylz021129

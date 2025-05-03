@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.Result;
+import com.dp.dto.ShopDTO;
 import com.dp.entity.Shop;
 import com.dp.mapper.ShopMapper;
 import com.dp.service.IShopService;
@@ -79,7 +80,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         // 将店铺信息写入redis
-        
 
         return Result.ok(shop);
     }
@@ -109,5 +109,19 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 返回
 
         return Result.ok();
+    }
+
+    @Override
+    public Result updateSold(ShopDTO shopDTO) {
+        Long shopId = shopDTO.getId();
+        Integer count = shopDTO.getCount();
+        
+        // 更新数据库销量
+        boolean success = this.update()
+            .setSql("sold = sold + {0}", count)  // 使用参数化方式传递count
+            .eq("id", shopId)
+            .update();
+            
+        return success ? Result.ok() : Result.fail("更新销量失败");
     }
 }

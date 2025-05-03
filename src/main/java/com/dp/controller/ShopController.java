@@ -1,6 +1,5 @@
 package com.dp.controller;
 
-
 import javax.annotation.Resource;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dp.dto.Result;
+import com.dp.dto.ShopDTO;
 import com.dp.entity.Shop;
 import com.dp.service.IShopService;
 import com.dp.utils.SystemConstants;
@@ -68,25 +68,31 @@ public class ShopController {
     @PutMapping
     public Result updateShop(@RequestBody Shop shop) {
         // 写入数据库
-        
+
         return shopService.update(shop);
     }
 
     /**
      * 根据商铺类型分页查询商铺信息
      *
-     * @param typeId  商铺类型
-     * @param current 页码
+     * @param typeId    商铺类型
+     * @param current   页码
+     * @param sortBy    排序字段
+     * @param sortOrder 排序方式（ASC/DESC）
      * @return 商铺列表
      */
     @GetMapping("/of/type")
     public Result queryShopByType(
-            @RequestParam Integer typeId,
-            @RequestParam(defaultValue = "1") Integer current
-    ) {
+            @RequestParam(value = "typeId") Integer typeId,
+            @RequestParam(value = "current", required = false) Integer current,
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "sortOrder", required = false) String sortOrder) {
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
                 .eq("type_id", typeId)
+                .orderBy(StrUtil.isNotBlank(sortBy),
+                        "ASC".equalsIgnoreCase(sortOrder),
+                        sortBy)
                 .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
         // 返回数据
         return Result.ok(page.getRecords());
@@ -98,17 +104,38 @@ public class ShopController {
      * @param name    商铺名称关键字
      * @param current 页码
      * @return 商铺列表
+     *         type: 'shop',
+     *         current: 1,
+     *         sortBy: 'price',
+     *         sortOrder: 'desc'
      */
-    @GetMapping("/of/name")
+    @GetMapping("/search")
     public Result queryShopByName(
-            @RequestParam(required = false) String name,
-            @RequestParam(defaultValue = "1") Integer current
-    ) {
+            @RequestParam(value = "name") String name,
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "sortOrder", required = false) String sortOrder,
+            @RequestParam(value = "current", required = false) Integer current) {
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
-                .like(StrUtil.isNotBlank(name), "name", name)
-                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+                   .like(StrUtil.isNotBlank(name), "name", name)
+                   .orderBy(StrUtil.isNotBlank(sortBy),
+                            "ASC".equalsIgnoreCase(sortOrder),
+                            sortBy)
+                   .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         // 返回数据
         return Result.ok(page.getRecords());
+    }
+
+    /**
+     * 更新销量
+     *
+     * @param id 商铺id
+     * @return 无
+     */ 
+    @PutMapping("/sold")
+    public String putMethodName(@RequestBody ShopDTO shopDTO) {
+        //TODO: process PUT request
+        
+        return shopService.updateSold(shopDTO);
     }
 }

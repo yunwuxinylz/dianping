@@ -21,12 +21,12 @@ import com.dp.service.IShopTypeService;
  * @since 2021-12-22
  */
 @RestController
-@RequestMapping("/shop-type")
+@RequestMapping("/shop")
 public class ShopTypeController {
     @Resource
     private IShopTypeService typeService;
 
-    @GetMapping("list")
+    @GetMapping("/types")
     public Result queryTypeList() {
         List<ShopType> typeList = typeService
                 .query().orderByAsc("sort").list();

@@ -6,19 +6,24 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.LoginFormDTO;
+import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
 import com.dp.entity.User;
+import com.dp.entity.UserInfo;
 import com.dp.mapper.UserMapper;
+import com.dp.service.IUserInfoService;
 import com.dp.service.IUserService;
 import com.dp.utils.RegexUtils;
+import com.dp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpSession;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -40,8 +45,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private IUserInfoService userInfoService;
+
     @Override
-    public Result sendCode(String phone, HttpSession session) {
+    public Result sendCode(String phone) {
         //校验手机号
         if (RegexUtils.isPhoneInvalid(phone)){
             //不符合，返回错误消息
@@ -54,7 +62,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //发送验证码
         log.debug("验证码发送成功：{}",code);
         //返回ok
-        return Result.ok();
+        return Result.ok("验证码发送成功");
     }
 
     @Override
@@ -65,25 +73,63 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             //不符合，返回错误信息
             return Result.fail("手机号格式错误");
         }
-        //符合，校验验证码
-        //从redis获取验证码并校验
-        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
-        String code = loginForm.getCode();
-        if (cacheCode == null || !cacheCode.equals(code)) {
-            //不一致，报错
-            return Result.fail("验证码错误");
-        }
-        //一致，查询用户 select * from tb_user where phone = ? 并删除验证码
-        //select * from tb_user where phone =?
+
         User user = query().eq("phone",phone).one();
-        stringRedisTemplate.delete(LOGIN_CODE_KEY + phone);
 
         //判断用户是否存在
         if (user == null) {
             //不存在，创建新用户
-            user = createUserWithPhone(phone);
+            return Result.fail("用户不存在，请注册");
         }
-        
+
+        String code = loginForm.getCode();
+        String password = loginForm.getPassword();
+
+        if (password != null) {
+            // 校验密码
+            String userPassword = user.getPassword();
+            if (!userPassword.equals(password)) {
+                return Result.fail("密码错误");
+            }
+        }
+
+        if (code != null) {
+            // 校验验证码
+            String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+            if (cacheCode == null || !cacheCode.equals(code)) {
+                return Result.fail("验证码错误");
+            }
+        }
+
+        return getTokenKey(user);
+    }
+
+    // 注册
+    @Override
+    public Result register(RegisterFormDTO registerForm) {
+        // 校验手机号
+        String phone = registerForm.getPhone();
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            return Result.fail("手机号格式错误");
+        }
+        // 是否注册过
+        User user = query().eq("phone", phone).one();
+        if (user != null) {
+            return Result.fail("用户已存在");
+        }
+        // 校验验证码
+        String code = registerForm.getCode();
+        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+        if (cacheCode == null || !cacheCode.equals(code)) {
+            return Result.fail("验证码错误");
+        }
+        // 创建用户
+        user = createUserWithPhone(registerForm);
+        return Result.ok("注册成功");
+    }
+
+
+    private Result getTokenKey(User user) {
         // 获取用户id
         Long userId = user.getId();
         // 删除该用户的旧token
@@ -111,11 +157,75 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         
         return Result.ok(token);
     }
-    private User createUserWithPhone(String phone) {
+    private User createUserWithPhone(RegisterFormDTO registerForm) {
         User user = new User();
-        user.setPhone(phone);
+        user.setPhone(registerForm.getPhone());
+        user.setPassword(registerForm.getPassword());
         user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
         save(user);
         return user;    // 修改：返回创建的用户对象，而不是null
+    }
+
+    @Override
+    @Transactional
+    public Result update(UserInfo userInfo) {
+        // 1. 获取当前登录用户
+        UserDTO currentUser = UserHolder.getUser();
+        if (currentUser == null) {
+            return Result.fail("用户未登录");
+        }
+        
+        // 2. 验证用户身份
+        if (userInfo.getUserId() == null) {
+            // 如果前端没有提供用户ID，则使用当前登录用户的ID
+            userInfo.setUserId(currentUser.getId());
+        } else if (!userInfo.getUserId().equals(currentUser.getId())) {
+            // 不允许修改其他用户的信息
+            return Result.fail("无权修改其他用户信息");
+        }
+        
+        // 3. 校验字段合法性
+        
+        // 3.1 设置不允许用户修改的字段为null，防止恶意篡改
+        userInfo.setFans(null);  // 粉丝数不允许自行修改
+        userInfo.setFollowee(null);  // 关注数不允许自行修改
+        userInfo.setCredits(null);  // 积分不允许自行修改
+        userInfo.setLevel(null);  // 会员级别不允许自行修改
+        
+        // 4. 查询用户是否存在
+        UserInfo existingUserInfo = userInfoService.getById(userInfo.getUserId());
+        
+        try {
+            // 5. 更新用户信息
+            if (existingUserInfo == null) {
+                // 如果不存在，则创建新的用户信息记录
+                userInfo.setCreateTime(LocalDateTime.now());
+                userInfo.setUpdateTime(LocalDateTime.now());
+                userInfoService.save(userInfo);
+            } else {
+                // 如果存在，则更新
+                userInfo.setUpdateTime(LocalDateTime.now());
+                userInfoService.updateById(userInfo);
+            }
+            return Result.ok("更新成功");
+        } catch (Exception e) {
+            log.error("更新用户信息失败", e);
+            return Result.fail("更新失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    public Result updateUser(User user) {
+        // 1. 获取当前登录用户
+        UserDTO currentUser = UserHolder.getUser();
+        if (currentUser == null) {
+            return Result.fail("用户未登录");
+        }
+        
+        // 2. 更新用户信息
+        user.setId(currentUser.getId());
+        updateById(user);
+
+        return Result.ok("更新成功");
     }
 }
