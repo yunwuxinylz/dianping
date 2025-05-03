@@ -92,7 +92,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_CANCEL_ROUTING_KEY,
                 String.valueOf(order.getId()), message -> {
-                    message.getMessageProperties().setDelay(QUEUE_TTL);
+                    message.getMessageProperties().setDelay(QUEUE_TTL[0]);
                     message.getMessageProperties().setHeader("retry-count", 0);
                     return message;
                 });
