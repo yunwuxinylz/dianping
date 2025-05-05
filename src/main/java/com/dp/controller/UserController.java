@@ -20,6 +20,7 @@ import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
+import com.dp.dto.UserInfoDTO;
 import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.service.IUserInfoService;
@@ -97,25 +98,26 @@ public class UserController {
         return Result.ok("登出成功");
     }
 
-    @GetMapping("/me")
-    public Result me() {
-        // 获取当前登录的用户并返回
-        UserDTO user = UserHolder.getUser();
-        return Result.ok(user);
-    }
-
-    @GetMapping("/info/{id}")
-    public Result info(@PathVariable("id") Long userId) {
+    @GetMapping("/info")
+    public Result info() {
+        // 获取当前登录的用户id
+        UserDTO userDTO = UserHolder.getUser();
         // 查询详情
-        UserInfo info = userInfoService.getById(userId);
+        UserInfo info = userInfoService.getById(userDTO.getId());
         if (info == null) {
             // 没有详情，应该是第一次查看详情
             return Result.ok();
         }
-        info.setCreateTime(null);
-        info.setUpdateTime(null);
-        // 返回
-        return Result.ok(info);
+        UserInfoDTO infoDTO = new UserInfoDTO();
+        infoDTO.setId(userDTO.getId());
+        infoDTO.setNickName(userDTO.getNickName());
+        infoDTO.setIcon(userDTO.getIcon());
+        infoDTO.setGender(info.getGender());
+        infoDTO.setBirthday(info.getBirthday());
+        infoDTO.setCity(info.getCity());
+        infoDTO.setIntroduce(info.getIntroduce());
+        infoDTO.setEmail(info.getEmail());
+        return Result.ok(infoDTO);
     }
 
     @PutMapping("/info")

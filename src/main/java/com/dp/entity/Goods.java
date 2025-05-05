@@ -27,6 +27,8 @@ public class Goods implements Serializable {
 
     private Long price;
 
+    private Long originalPrice;
+
     private String description;
 
     private String images;

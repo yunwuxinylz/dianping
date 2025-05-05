@@ -1,11 +1,19 @@
 package com.dp.controller;
 
+import javax.annotation.Resource;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.dp.dto.Result;
 import com.dp.entity.Address;
 import com.dp.service.IAddressService;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
 
 @RestController
 @RequestMapping("/address")
@@ -20,14 +28,6 @@ public class AddressController {
     @GetMapping("/list")
     public Result list() {
         return addressService.getUserAddresses();
-    }
-    
-    /**
-     * 获取默认地址
-     */
-    @GetMapping("/default")
-    public Result getDefaultAddress() {
-        return addressService.getDefaultAddress();
     }
     
     /**
@@ -50,15 +50,15 @@ public class AddressController {
      * 删除地址
      */
     @DeleteMapping("/{id}")
-    public Result delete(@PathVariable("id") Integer addressId) {
+    public Result delete(@PathVariable("id") Long addressId) {
         return addressService.deleteAddress(addressId);
     }
     
     /**
      * 设置默认地址
      */
-    @PutMapping("/{id}/default")
-    public Result setDefault(@PathVariable("id") Integer addressId) {
+    @PutMapping("/set-default/{id}")
+    public Result setDefault(@PathVariable("id") Long addressId) {
         return addressService.setDefaultAddress(addressId);
     }
 }

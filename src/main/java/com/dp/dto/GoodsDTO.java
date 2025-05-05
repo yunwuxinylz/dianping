@@ -4,15 +4,19 @@ import lombok.Data;
 
 import java.util.List;
 
+import com.dp.entity.GoodSKU;
+
 @Data
 public class GoodsDTO {
     private Long id;
     private Long shopId;
     private String name;
     private Long price;
+    private Long originalPrice;
     private String description;
-    private List<String> imageList;
+    private List<String> images;
     private Integer stock;
     private Integer sold;
-    private Integer status;
+    private List<GoodSKU> skus;  // SKU列表
+
 }

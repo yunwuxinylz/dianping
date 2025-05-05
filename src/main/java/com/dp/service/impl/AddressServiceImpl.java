@@ -1,18 +1,23 @@
 package com.dp.service.impl;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.dp.dto.AddressDTO;
 import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
 import com.dp.entity.Address;
 import com.dp.mapper.AddressMapper;
 import com.dp.service.IAddressService;
 import com.dp.utils.UserHolder;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import cn.hutool.core.bean.BeanUtil;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -28,12 +33,19 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         
         // 查询用户的所有地址
         List<Address> addresses = lambdaQuery()
-                .eq(Address::getUserId, user.getId())
-                .orderByDesc(Address::getIsDefault)
-                .orderByDesc(Address::getCreatedAt)
-                .list();
+               .eq(Address::getUserId, user.getId())
+               .orderByDesc(Address::getIsDefault, Address::getCreatedAt)
+               .list();
+
+        // DTO转换
+        List<AddressDTO> addressesDTO = addresses.stream()
+               .map(address -> {
+                   AddressDTO addressDTO = BeanUtil.copyProperties(address, AddressDTO.class);
+                   return addressDTO;
+               })
+               .collect(Collectors.toList());  // 添加collect操作
                 
-        return Result.ok(addresses);
+        return Result.ok(addressesDTO);  // 返回DTO列表而不是实体列表
     }
 
     @Override
@@ -45,20 +57,19 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
             return Result.fail("用户未登录");
         }
         
+
         // 设置用户ID
         address.setUserId(user.getId());
-        address.setCreatedAt(LocalDateTime.now());
-        address.setUpdatedAt(LocalDateTime.now());
         
         // 如果是默认地址，将该用户其他地址设为非默认
         if (Boolean.TRUE.equals(address.getIsDefault())) {
             baseMapper.clearDefaultByUserId(user.getId());
         }
-        
-        // 保存地址
+
         save(address);
         
-        return Result.ok(address.getAddressId());
+        
+        return Result.ok();
     }
 
     @Override
@@ -71,16 +82,13 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         }
         
         // 验证地址是否属于当前用户
-        Address existingAddress = getById(address.getAddressId());
+        Address existingAddress = getById(address.getId());
         if (existingAddress == null) {
             return Result.fail("地址不存在");
         }
         if (!existingAddress.getUserId().equals(user.getId())) {
             return Result.fail("无权修改此地址");
         }
-        
-        // 设置更新时间
-        address.setUpdatedAt(LocalDateTime.now());
         
         // 如果设置为默认地址，将该用户其他地址设为非默认
         if (Boolean.TRUE.equals(address.getIsDefault()) && !Boolean.TRUE.equals(existingAddress.getIsDefault())) {
@@ -94,7 +102,7 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
     }
 
     @Override
-    public Result deleteAddress(Integer addressId) {
+    public Result deleteAddress(Long addressId) {
         // 获取当前登录用户
         UserDTO user = UserHolder.getUser();
         if (user == null) {
@@ -118,7 +126,7 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
 
     @Override
     @Transactional
-    public Result setDefaultAddress(Integer addressId) {
+    public Result setDefaultAddress(Long addressId) {
         // 获取当前登录用户
         UserDTO user = UserHolder.getUser();
         if (user == null) {
@@ -145,29 +153,4 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         return Result.ok();
     }
 
-    @Override
-    public Result getDefaultAddress() {
-        // 获取当前登录用户
-        UserDTO user = UserHolder.getUser();
-        if (user == null) {
-            return Result.fail("用户未登录");
-        }
-        
-        // 查询默认地址
-        Address defaultAddress = lambdaQuery()
-                .eq(Address::getUserId, user.getId())
-                .eq(Address::getIsDefault, true)
-                .one();
-                
-        if (defaultAddress == null) {
-            // 如果没有默认地址，返回最新添加的地址
-            defaultAddress = lambdaQuery()
-                    .eq(Address::getUserId, user.getId())
-                    .orderByDesc(Address::getCreatedAt)
-                    .last("LIMIT 1")
-                    .one();
-        }
-        
-        return Result.ok(defaultAddress);
-    }
 }

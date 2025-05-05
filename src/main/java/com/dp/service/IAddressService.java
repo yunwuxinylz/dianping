@@ -24,15 +24,11 @@ public interface IAddressService extends IService<Address> {
     /**
      * 删除收货地址
      */
-    Result deleteAddress(Integer addressId);
+    Result deleteAddress(Long addressId);
     
     /**
      * 设置默认收货地址
      */
-    Result setDefaultAddress(Integer addressId);
+    Result setDefaultAddress(Long addressId);
     
-    /**
-     * 获取默认收货地址
-     */
-    Result getDefaultAddress();
 }

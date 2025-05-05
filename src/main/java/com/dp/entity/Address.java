@@ -22,8 +22,8 @@ public class Address implements Serializable {
     /**
      * 地址ID
      */
-    @TableId(value = "address_id", type = IdType.AUTO)
-    private Integer addressId;
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
 
     /**
      * 用户ID
@@ -33,7 +33,7 @@ public class Address implements Serializable {
     /**
      * 收件人姓名
      */
-    private String recipientName;
+    private String name;
 
     /**
      * 收件人电话
@@ -41,24 +41,9 @@ public class Address implements Serializable {
     private String phone;
 
     /**
-     * 省份
-     */
-    private String province;
-
-    /**
-     * 城市
-     */
-    private String city;
-
-    /**
-     * 区/县
-     */
-    private String district;
-
-    /**
      * 详细地址
      */
-    private String detailedAddress;
+    private String address;
 
     /**
      * 是否默认地址 0-否 1-是

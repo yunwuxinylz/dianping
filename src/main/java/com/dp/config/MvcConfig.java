@@ -25,13 +25,13 @@ public class MvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/shop/**",
                         "/voucher/**",
-                        "/shop-type/**",
                         "/upload/**",
                         "/blog/hot",
                         "/user/code",
                         "/user/login",
                         "/user/logout",
-                        "/user/register"
+                        "/user/register",
+                        "/goods/**"
                 ).order(1);
         //token刷新的拦截器
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).addPathPatterns("/**").order(0);

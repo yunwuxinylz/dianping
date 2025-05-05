@@ -16,4 +16,5 @@ public class ShopDTO {
     private Integer sold;
     private Integer score;
     private Integer count;
+    
 }

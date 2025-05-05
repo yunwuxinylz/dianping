@@ -11,6 +11,7 @@ import javax.annotation.Resource;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.Result;
@@ -111,17 +112,26 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok();
     }
 
+    @Transactional
     @Override
     public Result updateSold(ShopDTO shopDTO) {
         Long shopId = shopDTO.getId();
         Integer count = shopDTO.getCount();
+        Shop shop = this.getById(shopId);
+        if (shop == null) {
+            return Result.fail("店铺不存在");
+        }
+        if (shop.getSold() < count) {
+            return Result.fail("库存不足");
+        }
         
         // 更新数据库销量
         boolean success = this.update()
-            .setSql("sold = sold + {0}", count)  // 使用参数化方式传递count
+            .setSql("sold = sold +" + count)  // 使用参数化方式传递count
             .eq("id", shopId)
+            .ge("sold", count)
             .update();
             
-        return success ? Result.ok() : Result.fail("更新销量失败");
+        return success ? Result.ok(shop.getSold() + count) : Result.fail("更新销量失败");
     }
 }

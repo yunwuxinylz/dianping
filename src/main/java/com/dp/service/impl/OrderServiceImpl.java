@@ -57,22 +57,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             throw new RuntimeException("商品不存在");
         }
 
-        // 检查库存
-        if (goods.getStock() < orderCreateDTO.getAmount()) {
-            throw new RuntimeException("库存不足");
-        }
-
-        // 扣减库存
-        boolean success = goodsService.update()
-                .setSql("stock = stock - " + orderCreateDTO.getAmount())
-                .setSql("sold = sold + " + orderCreateDTO.getAmount())
-                .eq("id", goods.getId())
-                .gt("stock", orderCreateDTO.getAmount() - 1)
-                .update();
-        if (!success) {
-            throw new RuntimeException("库存不足");
-        }
-
         // 创建订单
         Order order = new Order();
 

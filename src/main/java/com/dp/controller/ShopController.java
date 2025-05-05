@@ -1,5 +1,9 @@
 package com.dp.controller;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import javax.annotation.Resource;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +20,6 @@ import com.dp.dto.Result;
 import com.dp.dto.ShopDTO;
 import com.dp.entity.Shop;
 import com.dp.service.IShopService;
-import com.dp.utils.SystemConstants;
 
 import cn.hutool.core.util.StrUtil;
 
@@ -40,7 +43,7 @@ public class ShopController {
      * @param id 商铺id
      * @return 商铺详情数据
      */
-    @GetMapping("/{id}")
+    @GetMapping("/detail/{id}")
     public Result queryShopById(@PathVariable Long id) {
         return shopService.queryById(id);
     }
@@ -86,16 +89,26 @@ public class ShopController {
             @RequestParam(value = "typeId") Integer typeId,
             @RequestParam(value = "current", required = false) Integer current,
             @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
             @RequestParam(value = "sortOrder", required = false) String sortOrder) {
+
+        // 总记录数
+        Long count = shopService.query()
+                .eq("type_id", typeId)
+                .count();
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
                 .eq("type_id", typeId)
                 .orderBy(StrUtil.isNotBlank(sortBy),
                         "ASC".equalsIgnoreCase(sortOrder),
                         sortBy)
-                .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
+                .page(new Page<>(current, pageSize));
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("total", count);
+        map.put("list", page.getRecords());
         // 返回数据
-        return Result.ok(page.getRecords());
+        return Result.ok(map);
     }
 
     /**
@@ -114,16 +127,31 @@ public class ShopController {
             @RequestParam(value = "name") String name,
             @RequestParam(value = "sortBy", required = false) String sortBy,
             @RequestParam(value = "sortOrder", required = false) String sortOrder,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
             @RequestParam(value = "current", required = false) Integer current) {
+        // 处理排序字段映射
+        if ("price".equals(sortBy)) {
+            sortBy = "avg_price";
+        }
+        
+        // 总数
+        Long count = shopService.query()
+               .like(StrUtil.isNotBlank(name), "name", name)
+               .count();
+        
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
                    .like(StrUtil.isNotBlank(name), "name", name)
                    .orderBy(StrUtil.isNotBlank(sortBy),
                             "ASC".equalsIgnoreCase(sortOrder),
                             sortBy)
-                   .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+                   .page(new Page<>(current, pageSize));
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("total", count);
+        map.put("list", page.getRecords());
         // 返回数据
-        return Result.ok(page.getRecords());
+        return Result.ok(map);
     }
 
     /**
@@ -133,9 +161,29 @@ public class ShopController {
      * @return 无
      */ 
     @PutMapping("/sold")
-    public String putMethodName(@RequestBody ShopDTO shopDTO) {
-        //TODO: process PUT request
+    public Result putMethodName(@RequestBody ShopDTO shopDTO) {
         
         return shopService.updateSold(shopDTO);
     }
+
+    /**
+     * 商铺推荐
+     * 
+     * @param limit 数量
+     * @param sortBy 排序字段
+     * 
+     * @return 商铺列表
+     */
+    @GetMapping("/recommend")
+    public Result queryShopByRecommend(
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "sortBy", required = false) String sortBy) {
+        // 根据类型分页查询
+        List<Shop> shops = shopService.query()
+                .orderByDesc(sortBy)
+                .last("limit " + limit)
+                .list();
+        return Result.ok(shops);
+    }
+
 }

@@ -43,6 +43,11 @@ public class UserInfo implements Serializable {
     private String introduce;
 
     /**
+     * 邮箱
+     */
+    private String email;
+    
+    /**
      * 粉丝数量
      */
     private Integer fans;
