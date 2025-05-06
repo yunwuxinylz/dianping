@@ -18,7 +18,7 @@ import com.dp.entity.UserInfo;
  */
 public interface IUserService extends IService<User> {
 
-    Result sendCode(String phone);
+    Result sendCode(String phone, String type);
 
     Result login(LoginFormDTO loginForm);
 
@@ -29,4 +29,6 @@ public interface IUserService extends IService<User> {
     Result updateUser(User user);
 
     Result getInfoDTO();
+
+    Result resetPassword(String phone, String code, String password);
 }

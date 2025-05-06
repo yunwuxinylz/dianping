@@ -56,7 +56,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     private IUserInfoService userInfoService;
 
     @Override
-    public Result sendCode(String phone) {
+    public Result sendCode(String phone, String type) {
         // 校验手机号
         if (RegexUtils.isPhoneInvalid(phone)) {
             // 不符合，返回错误消息
@@ -64,12 +64,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 符合，生成验证码
         String code = RandomUtil.randomNumbers(6);
-        // 保存验证码session到redis数据库中,set key value ex 120
-        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+        // 保存验证码
+        stringRedisTemplate.opsForValue().set("code:" + type + ":" + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
         // 发送验证码
         log.debug("验证码发送成功：{}", code);
         // 返回ok
-        return Result.ok("验证码发送成功");
+        return Result.ok(code);
     }
 
     @Override
@@ -102,11 +102,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         if (code != null) {
             // 校验验证码
-            String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+            String cacheCode = stringRedisTemplate.opsForValue().get("code:login:" + phone);
             if (cacheCode == null || !cacheCode.equals(code)) {
                 return Result.fail("验证码错误");
             }
         }
+        // 删除验证码
+        stringRedisTemplate.delete("code:login:" + phone);
 
         return getTokenKey(user);
     }
@@ -126,12 +128,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 校验验证码
         String code = registerForm.getCode();
-        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+        String cacheCode = stringRedisTemplate.opsForValue().get("code:register:" + phone);
         if (cacheCode == null || !cacheCode.equals(code)) {
             return Result.fail("验证码错误");
         }
         // 创建用户
         user = createUserWithPhone(registerForm);
+        // 删除验证码
+        stringRedisTemplate.delete("code:register:" + phone);
         return Result.ok("注册成功");
     }
 
@@ -172,6 +176,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         save(user);
         return user; // 修改：返回创建的用户对象，而不是null
     }
+
+    /**
+     * 忘记密码功能
+     *
+     * @param phone
+     * @param password
+     */
+    @Override
+    @Transactional
+    public Result resetPassword(String phone, String code, String password) {
+        // 校验手机号
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            return Result.fail("手机号格式错误");
+        }
+        // 校验验证码
+        String redisCode = stringRedisTemplate.opsForValue().get("code:reset:" + phone);
+        if (code == null ||!code.equals(redisCode)) {
+            return Result.fail("验证码错误");
+        }
+        // 根据手机号查询用户
+        User user = query().eq("phone", phone).one();
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+        // 更新用户密码
+        user.setPassword(password);
+        updateById(user);
+        // 删除验证码
+        stringRedisTemplate.delete("code:reset:" + phone);
+        return Result.ok("密码修改成功");
+    }
+    
 
     @Override
     @Transactional

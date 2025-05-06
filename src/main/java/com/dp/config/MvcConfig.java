@@ -31,6 +31,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/user/login",
                         "/user/logout",
                         "/user/register",
+                        "/user/reset-password",
                         "/goods/**"
                 ).order(1);
         //token刷新的拦截器

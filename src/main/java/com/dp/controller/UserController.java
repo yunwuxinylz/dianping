@@ -24,6 +24,7 @@ import com.dp.service.IUserService;
 import com.dp.utils.RedisConstants;
 import com.dp.utils.UserHolder;
 
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,8 +55,13 @@ public class UserController {
     public Result sendCode(@RequestBody Map<String, String> data) {
         // 1.获取手机号
         String phone = data.get("phone");
+        if (StrUtil.isBlank(phone)) {
+            return Result.fail("手机号不能为空");
+        }
+        // 方式
+        String type= data.get("type");
         // 发送短信验证码并保存验证码
-        return userService.sendCode(phone);
+        return userService.sendCode(phone, type);
     }
 
     /**
@@ -79,6 +85,20 @@ public class UserController {
     public Result register(@RequestBody RegisterFormDTO registerForm) {
         // 实现注册功能
         return userService.register(registerForm);
+    }
+
+
+    /**
+     * 忘记密码功能
+     *
+     * @param phone
+     * @param password
+     * @return
+     */
+    @PostMapping("/reset-password")
+    public Result resetPassword(@RequestParam String phone, @RequestParam String code, @RequestParam String password) {
+        // 实现忘记密码功能
+        return userService.resetPassword(phone, code, password);
     }
 
     /**
