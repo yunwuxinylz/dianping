@@ -1,10 +1,9 @@
 package com.dp.controller;
 
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,14 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dp.dto.GoodsDTO;
 import com.dp.dto.Result;
-import com.dp.entity.Goods;
 import com.dp.service.IGoodsService;
-
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.StrUtil;
+import com.dp.service.IShopService;
 
 // 商品Controller
 @RestController
@@ -30,6 +25,9 @@ import cn.hutool.core.util.StrUtil;
 public class GoodsController {
     @Autowired
     private IGoodsService goodsService;
+
+    @Resource
+    private IShopService shopService;
 
     /**
      * 根据店铺id查询商品列表
@@ -51,11 +49,11 @@ public class GoodsController {
      */
     @GetMapping("/detail/{id}")
     public Result queryGoodsById(@PathVariable("id") Long id) {
-        GoodsDTO goods = goodsService.queryGoodsById(id);
-        if (goods == null) {
+        GoodsDTO goodsDTO = goodsService.queryGoodsById(id);
+        if (goodsDTO == null) {
             return Result.fail("商品不存在");
         }
-        return Result.ok(goods);
+        return Result.ok(goodsDTO);
     }
 
     /**
@@ -76,52 +74,19 @@ public class GoodsController {
         if ("avg_price".equals(sortBy)) {
             sortBy = "price";
         }
-        // 分页查询
-        Page<Goods> page = goodsService.query()
-                .like(StrUtil.isNotBlank(name), "name", name)
-                .orderBy(StrUtil.isNotBlank(sortBy),
-                        "ASC".equalsIgnoreCase(sortOrder),
-                        sortBy)
-                .page(new Page<>(current, pageSize));
-
-        // map
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", page.getRecords());
-
-        return Result.ok(map);
+        return goodsService.goodsSearchList(name, sortBy, sortOrder, pageSize, current);
     }
 
     /**
      * 获取推荐商品
-     *
-     * @param limit
-     * @param sortBy
-     * 
-     * @return 商品列表
      */
     @GetMapping("/recommend")
     public Result queryGoodsByRecommend(@RequestParam Integer count) {
 
-        // 随机获取商品
-        List<Goods> goods = goodsService.query()
-                .orderByDesc("sold")
-                .last("LIMIT " + count)
-                .list();
-        
-        // 转换为DTO
-        List<GoodsDTO> goodsDTOList = goods.stream()
-                .map(item -> {
-                    GoodsDTO goodsDTO = BeanUtil.copyProperties(item, GoodsDTO.class);
-                    goodsDTO.setImages(Arrays.asList(item.getImages().split(",")));
-                    return goodsDTO;
-                })
-                .collect(Collectors.toList());
-
-        return Result.ok(goodsDTOList);
-
+        return goodsService.goodsRecommendList(count);
     }
 
+    
 
     /**
      * 更新库存
@@ -136,9 +101,9 @@ public class GoodsController {
         Integer goodsCount = goodsIdAndCount.get("count");
         Long skuId = Long.valueOf(goodsIdAndCount.get("skuId"));
         if (goodsId == null || goodsCount == null || skuId == null) {
-            return Result.fail("参数错误");    
+            return Result.fail("参数错误");
         }
-        
+
         return goodsService.updateStock(goodsId, goodsCount, skuId);
     }
 
@@ -157,7 +122,7 @@ public class GoodsController {
         if (goodsId == null || goodsCount == null || skuId == null) {
             return Result.fail("参数错误");
         }
-        
+
         return goodsService.updateSold(goodsId, goodsCount, skuId);
     }
 }

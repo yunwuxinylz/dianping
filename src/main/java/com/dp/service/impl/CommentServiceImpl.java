@@ -25,6 +25,7 @@ import com.dp.entity.OrderItems;
 import com.dp.mapper.CommentMapper;
 import com.dp.service.ICommentService;
 import com.dp.service.IOrderItemsService;
+import com.dp.service.IOrderService;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -38,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements ICommentService {
 
     @Resource
-    private OrderServiceImpl orderService;
+    private IOrderService orderService;
 
     @Resource
     private IOrderItemsService orderItemsService;  // 添加这个依赖

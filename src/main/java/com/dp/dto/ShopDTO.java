@@ -1,5 +1,7 @@
 package com.dp.dto;
 
+import java.util.List;
+
 import lombok.Data;
 
 /**
@@ -9,12 +11,14 @@ import lombok.Data;
 public class ShopDTO {
     private Long id;
     private String name;
-    private String typeId;
     private String address;
-    private String images;
+    private String area;
+    private List<String> images;
     private Long avgPrice;
     private Integer sold;
     private Integer score;
     private Integer count;
     
+    private Long typeId;
+    private String typeName;
 }

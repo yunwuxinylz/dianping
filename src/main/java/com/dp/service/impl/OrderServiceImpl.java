@@ -51,7 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
-    @Autowired
+    @Resource
     private IGoodsService goodsService;
 
     @Resource

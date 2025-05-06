@@ -1,16 +1,5 @@
 package com.dp.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.dp.dto.GoodsDTO;
-import com.dp.dto.Result;
-import com.dp.entity.GoodSKU;
-import com.dp.entity.Goods;
-import com.dp.mapper.GoodsMapper;
-import com.dp.service.IGoodsService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -19,12 +8,34 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.dp.dto.GoodsDTO;
+import com.dp.dto.GoodsSearchDTO;
+import com.dp.dto.Result;
+import com.dp.entity.GoodSKU;
+import com.dp.entity.Goods;
+import com.dp.entity.Shop;
+import com.dp.mapper.GoodsMapper;
+import com.dp.service.IGoodSKUService;
+import com.dp.service.IGoodsService;
+import com.dp.service.IShopService;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+
 // 商品Service实现
 @Service
 public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements IGoodsService {
 
     @Resource
-    private GoodSKUServiceImpl goodSKUService;
+    private IGoodSKUService goodSKUService;
+
+    @Resource
+    private IShopService shopService;
 
     @Override
     public List<GoodsDTO> queryGoodsByShopId(Long shopId) {
@@ -107,21 +118,97 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         }
         // 更新sku的销量
         boolean success = goodSKUService.update()
-               .setSql("sold = sold + " + count)
-               .eq("id", skuId)
-               .update();
+                .setSql("sold = sold + " + count)
+                .eq("id", skuId)
+                .update();
 
         if (success) {
             // 使用乐观锁更新销量
             boolean success2 = update()
-                   .setSql("sold = sold + " + count)
-                   .eq("id", goodsId)
-                   .update();
+                    .setSql("sold = sold + " + count)
+                    .eq("id", goodsId)
+                    .update();
 
             if (success2) {
                 return Result.ok(goods.getSold() + count);
             }
         }
         return Result.fail("销量不足");
+    }
+
+    @Override
+    public Result goodsSearchList(String name, String sortBy, String sortOrder, Integer pageSize, Integer current) {
+        // 分页查询
+        Page<Goods> page = this.query()
+                .like(StrUtil.isNotBlank(name), "name", name)
+                .orderBy(StrUtil.isNotBlank(sortBy),
+                        "ASC".equalsIgnoreCase(sortOrder),
+                        sortBy)
+                .page(new Page<>(current, pageSize));
+
+        // 获取所有店铺ID
+        List<Long> shopIds = page.getRecords().stream()
+                .map(Goods::getShopId)
+                .collect(Collectors.toList());
+
+        // 一次性查询所有店铺信息
+        Map<Long, Shop> shopMap = shopIds.isEmpty()
+                ? new HashMap<>()
+                : shopService.listByIds(shopIds).stream()
+                        .collect(Collectors.toMap(Shop::getId, shop -> shop));
+
+        // 转换为DTO
+        List<GoodsSearchDTO> goodsDTOList = page.getRecords().stream()
+                .map(item -> {
+                    GoodsSearchDTO goodsDTO = BeanUtil.copyProperties(item, GoodsSearchDTO.class);
+                    if (item.getImages() != null) {
+                        goodsDTO.setImages(Arrays.asList(item.getImages().split(",")));
+                    }
+                    // 从Map中获取店铺信息
+                    Shop shop = shopMap.get(item.getShopId());
+                    if (shop != null) {
+                        goodsDTO.setShopName(shop.getName());
+                        goodsDTO.setAddress(shop.getAddress());
+                        goodsDTO.setScore(shop.getScore());
+                        goodsDTO.setDistance(shop.getDistance());
+
+                    }
+                    return goodsDTO;
+                })
+                .collect(Collectors.toList());
+        // map
+        Map<String, Object> map = new HashMap<>();
+        map.put("total", page.getTotal());
+        map.put("list", goodsDTOList); // 修改这里，返回转换后的DTO列表
+
+        return Result.ok(map);
+    }
+
+    @Override
+    public Result goodsRecommendList(Integer count) {
+        // 随机获取商品
+        List<Goods> goods = this.query()
+                .orderByDesc("sold")
+                .last("LIMIT " + count)
+                .list();
+
+        // 转换为DTO
+        List<GoodsSearchDTO> goodsDTOList = goods.stream()
+                .map(item -> {
+                    GoodsSearchDTO goodsDTO = BeanUtil.copyProperties(item, GoodsSearchDTO.class);
+                    if (item.getImages() != null) {
+                        goodsDTO.setImages(Arrays.asList(item.getImages().split(",")));
+                    }
+                    // 根据店铺id查询店铺详情
+                    Shop shop = shopService.getById(item.getShopId());
+                    if (shop != null) {
+                        goodsDTO.setShopName(shop.getName());
+                        goodsDTO.setAddress(shop.getAddress());
+                    }
+                    return goodsDTO;
+                })
+                .collect(Collectors.toList());
+
+        return Result.ok(goodsDTOList);
     }
 }

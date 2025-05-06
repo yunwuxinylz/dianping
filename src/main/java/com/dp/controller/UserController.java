@@ -4,11 +4,9 @@ package com.dp.controller;
 import java.util.Map;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpSession;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,8 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
-import com.dp.dto.UserDTO;
-import com.dp.dto.UserInfoDTO;
 import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.service.IUserInfoService;
@@ -92,7 +88,6 @@ public class UserController {
      */
     @PostMapping("/logout")
     public Result logout(@RequestParam String phone) {
-        // TODO 实现登出功能
         UserHolder.removeUser();
         stringRedisTemplate.delete(RedisConstants.LOGIN_CODE_KEY + phone);
         return Result.ok("登出成功");
@@ -100,25 +95,11 @@ public class UserController {
 
     @GetMapping("/info")
     public Result info() {
-        // 获取当前登录的用户id
-        UserDTO userDTO = UserHolder.getUser();
-        // 查询详情
-        UserInfo info = userInfoService.getById(userDTO.getId());
-        if (info == null) {
-            // 没有详情，应该是第一次查看详情
-            return Result.ok();
-        }
-        UserInfoDTO infoDTO = new UserInfoDTO();
-        infoDTO.setId(userDTO.getId());
-        infoDTO.setNickName(userDTO.getNickName());
-        infoDTO.setIcon(userDTO.getIcon());
-        infoDTO.setGender(info.getGender());
-        infoDTO.setBirthday(info.getBirthday());
-        infoDTO.setCity(info.getCity());
-        infoDTO.setIntroduce(info.getIntroduce());
-        infoDTO.setEmail(info.getEmail());
-        return Result.ok(infoDTO);
+        // 获取当前登录的用户信息
+        return userService.getInfoDTO();
     }
+
+    
 
     @PutMapping("/info")
     public Result update(@RequestBody UserInfo userInfo) {

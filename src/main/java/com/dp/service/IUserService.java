@@ -27,4 +27,6 @@ public interface IUserService extends IService<User> {
     Result update(UserInfo userInfo);
 
     Result updateUser(User user);
+
+    Result getInfoDTO();
 }

@@ -20,4 +20,10 @@ public interface IShopService extends IService<Shop> {
 
     Result updateSold(ShopDTO shopDTO);
 
+    Result shopByType(Integer typeId, Integer current, String sortBy, Integer pageSize, String sortOrder);
+
+    Result shopByName(String name, String sortBy, String sortOrder, Integer pageSize, Integer current);
+
+    Result shopRecommendList(Integer limit, String sortBy);
+
 }

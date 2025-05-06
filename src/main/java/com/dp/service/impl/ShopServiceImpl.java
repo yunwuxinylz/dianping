@@ -5,7 +5,12 @@ import static com.dp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.dp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.dp.utils.RedisConstants.LOCK_SHOP_KEY;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -13,13 +18,17 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.Result;
 import com.dp.dto.ShopDTO;
 import com.dp.entity.Shop;
+import com.dp.entity.ShopType;
 import com.dp.mapper.ShopMapper;
 import com.dp.service.IShopService;
+import com.dp.service.IShopTypeService;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
@@ -29,13 +38,15 @@ import cn.hutool.json.JSONUtil;
  * 服务实现类
  * </p>
  *
- * @since 2021-12-22
  */
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private IShopTypeService shopTypeService;
 
     @Override
     public Result queryById(Long id) {
@@ -124,14 +135,120 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (shop.getSold() < count) {
             return Result.fail("库存不足");
         }
-        
+
         // 更新数据库销量
         boolean success = this.update()
-            .setSql("sold = sold +" + count)  // 使用参数化方式传递count
-            .eq("id", shopId)
-            .ge("sold", count)
-            .update();
-            
+                .setSql("sold = sold +" + count) // 使用参数化方式传递count
+                .eq("id", shopId)
+                .ge("sold", count)
+                .update();
+
         return success ? Result.ok(shop.getSold() + count) : Result.fail("更新销量失败");
     }
+
+    @Override
+    public Result shopByType(Integer typeId, Integer current, String sortBy, Integer pageSize, String sortOrder) {
+        ShopType shopType = shopTypeService.getById(typeId);
+        if (shopType == null) {
+            return Result.fail("商铺类型不存在");
+        }
+        // 根据类型分页查询
+        Page<Shop> page = this.query()
+                .eq("type_id", typeId)
+                .orderBy(StrUtil.isNotBlank(sortBy),
+                        "ASC".equalsIgnoreCase(sortOrder),
+                        sortBy)
+                .page(new Page<>(current, pageSize));
+
+        // 转DTO
+        List<ShopDTO> shopDTOList = page.getRecords()
+                .stream()
+                .map(shop -> {
+                    ShopDTO shopDTO = BeanUtil.copyProperties(shop, ShopDTO.class);
+                    if (shop.getImages() != null) {
+                        List<String> imageList = Arrays.asList(shop.getImages().split(","));
+                        shopDTO.setImages(imageList);
+                    }
+                    shopDTO.setTypeName(shopType.getName());
+                    return shopDTO;
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("total", page.getTotal());
+        map.put("list", shopDTOList);
+        // 返回数据
+        return Result.ok(map);
+    }
+
+    @Override
+    public Result shopByName(String name, String sortBy, String sortOrder, Integer pageSize, Integer current) {
+        // 根据类型分页查询
+        Page<Shop> page = this.query()
+                .like(StrUtil.isNotBlank(name), "name", name)
+                .orderBy(StrUtil.isNotBlank(sortBy),
+                        "ASC".equalsIgnoreCase(sortOrder),
+                        sortBy)
+                .page(new Page<>(current, pageSize));
+
+        List<Long> typeIds = page.getRecords()
+                .stream()
+                .map(Shop::getTypeId)
+                .collect(Collectors.toList());
+
+        List<ShopType> shopTypes = shopTypeService.listByIds(typeIds);
+        Map<Long, String> typeMap = shopTypes.stream()
+                .collect(Collectors.toMap(ShopType::getId, ShopType::getName));
+
+        // 转DTO
+        List<ShopDTO> shopDTOList = page.getRecords()
+                .stream()
+                .map(shop -> {
+                    ShopDTO shopDTO = BeanUtil.copyProperties(shop, ShopDTO.class);
+                    if (shop.getImages() != null) {
+                        List<String> imageList = Arrays.asList(shop.getImages().split(","));
+                        shopDTO.setImages(imageList);
+                    }
+                    shopDTO.setTypeName(typeMap.get(shop.getTypeId()));
+                    return shopDTO;
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("total", page.getTotal());
+        map.put("list", shopDTOList);
+        // 返回数据
+        return Result.ok(map);
+    }
+
+    @Override
+    public Result shopRecommendList(Integer limit, String sortBy) {
+        // 根据类型分页查询
+        List<Shop> shops = this.query()
+                .orderByDesc(sortBy)
+                .last("limit " + limit)
+                .list();
+
+        List<Long> typeIds = shops.stream()
+                .map(Shop::getTypeId)
+                .collect(Collectors.toList());
+
+        List<ShopType> shopTypes = shopTypeService.listByIds(typeIds);
+        Map<Long, String> typeMap = shopTypes.stream()
+                .collect(Collectors.toMap(ShopType::getId, ShopType::getName));
+
+        // 转DTO
+        List<ShopDTO> shopDTOList = shops.stream()
+                .map(shop -> {
+                    ShopDTO shopDTO = BeanUtil.copyProperties(shop, ShopDTO.class);
+                    if (shop.getImages() != null) {
+                        List<String> imageList = Arrays.asList(shop.getImages().split(","));
+                        shopDTO.setImages(imageList);
+                    }
+                    shopDTO.setTypeName(typeMap.get(shop.getTypeId()));
+                    return shopDTO;
+                }).collect(Collectors.toList());
+        return Result.ok(shopDTOList);
+    }
+
 }

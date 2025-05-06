@@ -1,8 +1,6 @@
 package com.dp.controller;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import javax.annotation.Resource;
 
@@ -15,13 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dp.dto.Result;
 import com.dp.dto.ShopDTO;
 import com.dp.entity.Shop;
 import com.dp.service.IShopService;
-
-import cn.hutool.core.util.StrUtil;
 
 /**
  * <p>
@@ -92,19 +87,7 @@ public class ShopController {
             @RequestParam(value = "pageSize", required = false) Integer pageSize,
             @RequestParam(value = "sortOrder", required = false) String sortOrder) {
 
-        // 根据类型分页查询
-        Page<Shop> page = shopService.query()
-                .eq("type_id", typeId)
-                .orderBy(StrUtil.isNotBlank(sortBy),
-                        "ASC".equalsIgnoreCase(sortOrder),
-                        sortBy)
-                .page(new Page<>(current, pageSize));
-
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", page.getRecords());
-        // 返回数据
-        return Result.ok(map);
+        return shopService.shopByType(typeId, current, sortBy, pageSize, sortOrder);
     }
 
     /**
@@ -130,19 +113,7 @@ public class ShopController {
             sortBy = "avg_price";
         }
 
-        // 根据类型分页查询
-        Page<Shop> page = shopService.query()
-                .like(StrUtil.isNotBlank(name), "name", name)
-                .orderBy(StrUtil.isNotBlank(sortBy),
-                        "ASC".equalsIgnoreCase(sortOrder),
-                        sortBy)
-                .page(new Page<>(current, pageSize));
-
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", page.getRecords());
-        // 返回数据
-        return Result.ok(map);
+        return shopService.shopByName(name, sortBy, sortOrder, pageSize, current);
     }
 
     /**
@@ -169,12 +140,7 @@ public class ShopController {
     public Result queryShopByRecommend(
             @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "sortBy", required = false) String sortBy) {
-        // 根据类型分页查询
-        List<Shop> shops = shopService.query()
-                .orderByDesc(sortBy)
-                .last("limit " + limit)
-                .list();
-        return Result.ok(shops);
+        return shopService.shopRecommendList(limit, sortBy);
     }
 
 }

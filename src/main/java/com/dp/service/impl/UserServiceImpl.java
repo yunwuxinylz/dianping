@@ -1,14 +1,29 @@
 package com.dp.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.UUID;
-import cn.hutool.core.util.RandomUtil;
+import static com.dp.utils.RedisConstants.LOGIN_CODE_KEY;
+import static com.dp.utils.RedisConstants.LOGIN_CODE_TTL;
+import static com.dp.utils.RedisConstants.LOGIN_USER_ID_KEY;
+import static com.dp.utils.RedisConstants.LOGIN_USER_KEY;
+import static com.dp.utils.RedisConstants.LOGIN_USER_TTL;
+import static com.dp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Resource;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
+import com.dp.dto.UserInfoDTO;
 import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.mapper.UserMapper;
@@ -16,20 +31,12 @@ import com.dp.service.IUserInfoService;
 import com.dp.service.IUserService;
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.UUID;
+import cn.hutool.core.util.RandomUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.Resource;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import static com.dp.utils.RedisConstants.*;
-import static com.dp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 /**
  * <p>
@@ -50,35 +57,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     @Override
     public Result sendCode(String phone) {
-        //校验手机号
-        if (RegexUtils.isPhoneInvalid(phone)){
-            //不符合，返回错误消息
-            return  Result.fail("手机号格式错误！");
+        // 校验手机号
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            // 不符合，返回错误消息
+            return Result.fail("手机号格式错误！");
         }
-        //符合，生成验证码
+        // 符合，生成验证码
         String code = RandomUtil.randomNumbers(6);
-        //保存验证码session到redis数据库中,set key value ex 120
+        // 保存验证码session到redis数据库中,set key value ex 120
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
-        //发送验证码
-        log.debug("验证码发送成功：{}",code);
-        //返回ok
+        // 发送验证码
+        log.debug("验证码发送成功：{}", code);
+        // 返回ok
         return Result.ok("验证码发送成功");
     }
 
     @Override
     public Result login(LoginFormDTO loginForm) {
-        //校验手机号
+        // 校验手机号
         String phone = loginForm.getPhone();
         if (RegexUtils.isPhoneInvalid(phone)) {
-            //不符合，返回错误信息
+            // 不符合，返回错误信息
             return Result.fail("手机号格式错误");
         }
 
-        User user = query().eq("phone",phone).one();
+        User user = query().eq("phone", phone).one();
 
-        //判断用户是否存在
+        // 判断用户是否存在
         if (user == null) {
-            //不存在，创建新用户
+            // 不存在，创建新用户
             return Result.fail("用户不存在，请注册");
         }
 
@@ -128,7 +135,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok("注册成功");
     }
 
-
     private Result getTokenKey(User user) {
         // 获取用户id
         Long userId = user.getId();
@@ -138,32 +144,33 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             stringRedisTemplate.delete(LOGIN_USER_KEY + oldToken);
             stringRedisTemplate.delete(LOGIN_USER_ID_KEY + userId);
         }
-        
-        //随机生成新token
+
+        // 随机生成新token
         String token = UUID.randomUUID().toString(true);
-        //将User对象转为Hash存储
+        // 将User对象转为Hash存储
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
                 CopyOptions.create()
                         .setIgnoreNullValue(true)
                         .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
-        //存储用户信息
+        // 存储用户信息
         String tokenKey = LOGIN_USER_KEY + token;
         stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
         // 保存用户id到token的映射
         stringRedisTemplate.opsForValue().set(LOGIN_USER_ID_KEY + userId, token, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        //设置token有效期
+        // 设置token有效期
         stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        
+
         return Result.ok(token);
     }
+
     private User createUserWithPhone(RegisterFormDTO registerForm) {
         User user = new User();
         user.setPhone(registerForm.getPhone());
         user.setPassword(registerForm.getPassword());
         user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
         save(user);
-        return user;    // 修改：返回创建的用户对象，而不是null
+        return user; // 修改：返回创建的用户对象，而不是null
     }
 
     @Override
@@ -174,7 +181,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (currentUser == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 2. 验证用户身份
         if (userInfo.getUserId() == null) {
             // 如果前端没有提供用户ID，则使用当前登录用户的ID
@@ -183,18 +190,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             // 不允许修改其他用户的信息
             return Result.fail("无权修改其他用户信息");
         }
-        
+
         // 3. 校验字段合法性
-        
+
         // 3.1 设置不允许用户修改的字段为null，防止恶意篡改
-        userInfo.setFans(null);  // 粉丝数不允许自行修改
-        userInfo.setFollowee(null);  // 关注数不允许自行修改
-        userInfo.setCredits(null);  // 积分不允许自行修改
-        userInfo.setLevel(null);  // 会员级别不允许自行修改
-        
+        userInfo.setFans(null); // 粉丝数不允许自行修改
+        userInfo.setFollowee(null); // 关注数不允许自行修改
+        userInfo.setCredits(null); // 积分不允许自行修改
+        userInfo.setLevel(null); // 会员级别不允许自行修改
+
         // 4. 查询用户是否存在
         UserInfo existingUserInfo = userInfoService.getById(userInfo.getUserId());
-        
+
         try {
             // 5. 更新用户信息
             if (existingUserInfo == null) {
@@ -221,11 +228,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (currentUser == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 2. 更新用户信息
         user.setId(currentUser.getId());
         updateById(user);
 
         return Result.ok("更新成功");
     }
+
+    @Override
+    public Result getInfoDTO() {
+        // 获取当前登录的用户id
+        UserDTO userDTO = UserHolder.getUser();
+        // 查询详情
+        UserInfo info = userInfoService.getById(userDTO.getId());
+        if (info == null) {
+            // 没有详情，应该是第一次查看详情
+            return Result.ok();
+        }
+        UserInfoDTO infoDTO = BeanUtil.copyProperties(info, UserInfoDTO.class);
+        infoDTO.setId(userDTO.getId());
+        infoDTO.setNickName(userDTO.getNickName());
+        infoDTO.setIcon(userDTO.getIcon());
+        return Result.ok(infoDTO);
+    }
+
 }
