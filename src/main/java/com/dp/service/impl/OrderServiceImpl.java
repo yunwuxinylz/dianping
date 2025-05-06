@@ -221,8 +221,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 按创建时间降序
         wrapper.orderByDesc(Order::getCreateTime);
 
-        Long count = this.count(wrapper);
-
         // 创建分页对象并执行查询
         Page<Order> orderPage = page(new Page<>(queryDTO.getCurrent(), queryDTO.getPageSize()), wrapper);
 
@@ -265,7 +263,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 构建结果
         Map<String, Object> result = new HashMap<>();
         result.put("list", records);
-        result.put("total", count);
+        result.put("total", orderPage.getTotal());
         return Result.ok(result);
     }
 

@@ -92,10 +92,6 @@ public class ShopController {
             @RequestParam(value = "pageSize", required = false) Integer pageSize,
             @RequestParam(value = "sortOrder", required = false) String sortOrder) {
 
-        // 总记录数
-        Long count = shopService.query()
-                .eq("type_id", typeId)
-                .count();
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
                 .eq("type_id", typeId)
@@ -105,7 +101,7 @@ public class ShopController {
                 .page(new Page<>(current, pageSize));
 
         Map<String, Object> map = new HashMap<>();
-        map.put("total", count);
+        map.put("total", page.getTotal());
         map.put("list", page.getRecords());
         // 返回数据
         return Result.ok(map);
@@ -133,22 +129,17 @@ public class ShopController {
         if ("price".equals(sortBy)) {
             sortBy = "avg_price";
         }
-        
-        // 总数
-        Long count = shopService.query()
-               .like(StrUtil.isNotBlank(name), "name", name)
-               .count();
-        
+
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
-                   .like(StrUtil.isNotBlank(name), "name", name)
-                   .orderBy(StrUtil.isNotBlank(sortBy),
-                            "ASC".equalsIgnoreCase(sortOrder),
-                            sortBy)
-                   .page(new Page<>(current, pageSize));
+                .like(StrUtil.isNotBlank(name), "name", name)
+                .orderBy(StrUtil.isNotBlank(sortBy),
+                        "ASC".equalsIgnoreCase(sortOrder),
+                        sortBy)
+                .page(new Page<>(current, pageSize));
 
         Map<String, Object> map = new HashMap<>();
-        map.put("total", count);
+        map.put("total", page.getTotal());
         map.put("list", page.getRecords());
         // 返回数据
         return Result.ok(map);
@@ -159,17 +150,17 @@ public class ShopController {
      *
      * @param id 商铺id
      * @return 无
-     */ 
+     */
     @PutMapping("/sold")
     public Result putMethodName(@RequestBody ShopDTO shopDTO) {
-        
+
         return shopService.updateSold(shopDTO);
     }
 
     /**
      * 商铺推荐
      * 
-     * @param limit 数量
+     * @param limit  数量
      * @param sortBy 排序字段
      * 
      * @return 商铺列表

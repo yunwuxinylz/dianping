@@ -76,11 +76,6 @@ public class GoodsController {
         if ("avg_price".equals(sortBy)) {
             sortBy = "price";
         }
-        // 总记录数
-        Long count = goodsService.query()
-                .like("name", name)
-                .count();
-
         // 分页查询
         Page<Goods> page = goodsService.query()
                 .like(StrUtil.isNotBlank(name), "name", name)
@@ -91,7 +86,7 @@ public class GoodsController {
 
         // map
         Map<String, Object> map = new HashMap<>();
-        map.put("total", count);
+        map.put("total", page.getTotal());
         map.put("list", page.getRecords());
 
         return Result.ok(map);
