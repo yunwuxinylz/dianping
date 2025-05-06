@@ -10,7 +10,9 @@ import lombok.experimental.Accessors;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-// 订单实体类
+/**
+ * 订单实体类
+ */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
@@ -18,30 +20,99 @@ import java.time.LocalDateTime;
 public class Order implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 订单ID，自增主键
+     */
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    /**
+     * 下单用户ID
+     */
     private Long userId;
 
+    /**
+     * 商铺ID
+     */
     private Long shopId;
 
-    private Long goodsId;
+    /**
+     * 商铺名称
+     */
+    private String shopName;
 
-    private String goodsName;
+    /**
+     * 店铺logo
+     */
+    private String shopImage;
 
-    private Long goodsPrice;
+    /**
+     * 订单金额，单位：分
+     */
+    private Long amount;
 
-    private Integer amount;
-
-    private Long totalPrice;
-
+    /**
+     * 支付方式 1：微信支付 2：支付宝支付
+     */
     private Integer payType;
 
+    /**
+     * 订单状态 1：未支付 2：已支付 3：已取消 4：已完成 5：已退款
+     */
     private Integer status;
 
+    /**
+     * 订单备注
+     */
+    private String remark;
+
+    /**
+     * 地址ID
+     */
+    private Long addressId;
+
+    /**
+     * 地址详情
+     */
+    private String addressDetail;
+
+    /**
+     * 收货人
+     */
+    private String addressName;
+
+    /**
+     * 收货人手机号
+     */
+    private String addressPhone;
+
+    /**
+     * 总数量
+     */
+    private Integer count;
+
+    /**
+     * 是否评价
+     */
+    private Boolean commented;
+
+    /**
+     * 取消原因
+     */
+    private String cancelReason;
+
+    /**
+     * 订单创建时间
+     */
     private LocalDateTime createTime;
 
+    /**
+     * 订单支付时间
+     */
     private LocalDateTime payTime;
 
+    /**
+     * 订单更新时间
+     */
     private LocalDateTime updateTime;
 }

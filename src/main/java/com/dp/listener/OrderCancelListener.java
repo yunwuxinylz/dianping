@@ -71,7 +71,7 @@ public class OrderCancelListener {
                 channel.basicAck(deliveryTag, false);
             } else {
                 log.info("订单{}已重试{}次，执行取消", orderId, retryCount);
-                orderService.cancelOrder(Long.valueOf(orderId));
+                orderService.rabbitCancelOrder(Long.valueOf(orderId), "超时自动取消，未支付");
                 channel.basicAck(deliveryTag, false);
             }
         } catch (Exception e) {
