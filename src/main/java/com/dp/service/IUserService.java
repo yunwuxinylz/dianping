@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
-import com.dp.dto.UserDTO;
 import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 

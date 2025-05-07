@@ -1,7 +1,5 @@
 package com.dp.controller;
 
-import java.util.List;
-
 import javax.annotation.Resource;
 
 import org.springframework.web.bind.annotation.GetMapping;

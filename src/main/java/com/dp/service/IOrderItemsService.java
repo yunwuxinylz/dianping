@@ -1,7 +1,5 @@
 package com.dp.service;
 
-import java.util.List;
-
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.dp.entity.OrderItems;
 

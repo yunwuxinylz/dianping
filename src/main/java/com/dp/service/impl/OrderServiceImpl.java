@@ -13,11 +13,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.TreeMap;
 
 import javax.annotation.Resource;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -427,82 +427,82 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
 
-        // 根据用户查询所有订单
-        List<Order> userOrders = this.lambdaQuery()
-               .eq(Order::getUserId, userId)
-               .list();
-
         // 初始化统计对象
         OrderStatisticsDTO statistics = new OrderStatisticsDTO();
 
-        // 初始化订单状态统计
-        List<OrderStatusDTO> orderStatusList = new ArrayList<>();
-        orderStatusList.add(new OrderStatusDTO("待付款", 0, 1));
-        orderStatusList.add(new OrderStatusDTO("已支付", 0, 2));
-        orderStatusList.add(new OrderStatusDTO("已取消", 0, 3));
-        orderStatusList.add(new OrderStatusDTO("待收货", 0, 4));
-        orderStatusList.add(new OrderStatusDTO("已完成", 0, 5));
+        // 使用常量定义订单状态
+        final int STATUS_UNPAID = 1;
+        final int STATUS_PAID = 2;
+        final int STATUS_CANCELLED = 3;
+        final int STATUS_PENDING_RECEIPT = 4;
+        final int STATUS_COMPLETED = 5;
 
-        // 总订单数
+        // 初始化订单状态统计（使用Map提高查找效率）
+        Map<Integer, OrderStatusDTO> statusMap = new HashMap<>();
+        statusMap.put(STATUS_UNPAID, new OrderStatusDTO("待付款", 0, STATUS_UNPAID));
+        statusMap.put(STATUS_PAID, new OrderStatusDTO("已支付", 0, STATUS_PAID));
+        statusMap.put(STATUS_CANCELLED, new OrderStatusDTO("已取消", 0, STATUS_CANCELLED));
+        statusMap.put(STATUS_PENDING_RECEIPT, new OrderStatusDTO("待收货", 0, STATUS_PENDING_RECEIPT));
+        statusMap.put(STATUS_COMPLETED, new OrderStatusDTO("已完成", 0, STATUS_COMPLETED));
+
+        // 获取近15天的日期范围
+        LocalDate today = LocalDate.now();
+        LocalDate fifteenDaysAgo = today.minusDays(15);
+
+        // 一次性查询所有需要的数据，减少数据库访问次数
+        List<Order> userOrders = this.lambdaQuery()
+                .eq(Order::getUserId, userId)
+                .list();
+
+        // 计算总订单数
         statistics.setTotalOrders(userOrders.size());
 
-        // 总消费金额（初始为0）
-        Long totalAmount = 0L;
-
-        // 计算订单状态分布
-        for (Order order : userOrders) {
-            // 增加对应状态的订单数量
-            for (OrderStatusDTO statusDTO : orderStatusList) {
-                if (statusDTO.getStatus().equals(order.getStatus())) {
-                    statusDTO.setValue(statusDTO.getValue() + 1);
-                    break;
-                }
-            }
-
-            // 如果订单已支付，增加总消费金额（排除已取消的订单）
-            if (order.getStatus() >= 2 && order.getStatus() != 3) {
-                totalAmount += order.getAmount();
-            }
-        }
+        // 计算订单状态分布和总消费金额
+        long totalAmount = userOrders.stream()
+                .peek(order -> {
+                    // 更新对应状态的订单数量
+                    Integer status = order.getStatus();
+                    if (statusMap.containsKey(status)) {
+                        OrderStatusDTO statusDTO = statusMap.get(status);
+                        statusDTO.setValue(statusDTO.getValue() + 1);
+                    }
+                })
+                // 只计算已支付且未取消订单的金额
+                .filter(order -> order.getStatus() >= STATUS_PAID && order.getStatus() != STATUS_CANCELLED)
+                .mapToLong(Order::getAmount)
+                .sum();
 
         statistics.setTotalAmount(totalAmount);
-        statistics.setOrderStatus(orderStatusList);
+        statistics.setOrderStatus(new ArrayList<>(statusMap.values()));
 
-        // 计算最近7天消费趋势
+        // 使用更高效的方式计算每日消费
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        LocalDate today = LocalDate.now();
+        Map<String, Double> dailySpending = new TreeMap<>(); // 使用TreeMap保持日期顺序
 
-        // 生成最近7天的日期
-        List<String> days = new ArrayList<>();
-        Map<String, Double> dailyData = new HashMap<>();
-
-        for (int i = 6; i >= 0; i--) {
-            LocalDate day = today.minusDays(i);
-            String dayStr = day.format(formatter);
-            days.add(dayStr);
-            dailyData.put(dayStr, 0.0);
+        // 初始化日期范围内的每一天
+        for (int i = 14; i >= 0; i--) {
+            String dayStr = today.minusDays(i).format(formatter);
+            dailySpending.put(dayStr, 0.0);
         }
 
-        // 统计每天消费
-        for (Order order : userOrders) {
-            // 只统计已支付的订单
-            if (order.getStatus() >= 2 && order.getStatus() != 3) {
-                LocalDate orderDate = order.getCreateTime().toLocalDate();
-                String dayStr = orderDate.format(formatter);
+        // 填充每日消费数据
+        userOrders.stream()
+                .filter(order -> order.getStatus() >= STATUS_PAID && order.getStatus() != STATUS_CANCELLED)
+                .filter(order -> {
+                    LocalDate orderDate = order.getCreateTime().toLocalDate();
+                    return !orderDate.isBefore(fifteenDaysAgo);
+                })
+                .forEach(order -> {
+                    String dayStr = order.getCreateTime().toLocalDate().format(formatter);
+                    if (dailySpending.containsKey(dayStr)) {
+                        dailySpending.compute(dayStr, (k, v) -> v + (order.getAmount() / 100.0));
+                    }
+                });
 
-                // 如果是最近7天内的订单，增加该天消费
-                if (dailyData.containsKey(dayStr)) {
-                    Double currentAmount = dailyData.get(dayStr);
-                    dailyData.put(dayStr, currentAmount + (order.getAmount() / 100.0)); // 转换为元
-                }
-            }
-        }
-
-        // 转换为图表所需数据格式
-        List<DailySpendingDTO> monthlySpending = new ArrayList<>();
-        for (String day : days) {
-            monthlySpending.add(new DailySpendingDTO(day, dailyData.get(day)));
-        }
+        // 转换为最终数据格式
+        List<DailySpendingDTO> monthlySpending = dailySpending.entrySet().stream()
+                .map(entry -> new DailySpendingDTO(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
 
         statistics.setMonthlySpending(monthlySpending);
 

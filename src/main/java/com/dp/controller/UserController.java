@@ -1,6 +1,5 @@
 package com.dp.controller;
 
-
 import java.util.Map;
 
 import javax.annotation.Resource;
@@ -59,7 +58,7 @@ public class UserController {
             return Result.fail("手机号不能为空");
         }
         // 方式
-        String type= data.get("type");
+        String type = data.get("type");
         // 发送短信验证码并保存验证码
         return userService.sendCode(phone, type);
     }
@@ -76,7 +75,7 @@ public class UserController {
         return userService.login(loginForm);
     }
 
-    /** 
+    /**
      * 注册功能
      *
      * @param registerForm 注册参数，包含手机号、验证码、密码
@@ -87,7 +86,6 @@ public class UserController {
         return userService.register(registerForm);
     }
 
-
     /**
      * 忘记密码功能
      *
@@ -95,9 +93,12 @@ public class UserController {
      * @param password
      * @return
      */
-    @PostMapping("/reset-password")
-    public Result resetPassword(@RequestParam String phone, @RequestParam String code, @RequestParam String password) {
+    @PutMapping("/reset-password")
+    public Result resetPassword(@RequestBody Map<String, String> data) {
         // 实现忘记密码功能
+        String phone = data.get("phone");
+        String code = data.get("code");
+        String password = data.get("password");
         return userService.resetPassword(phone, code, password);
     }
 
@@ -119,8 +120,6 @@ public class UserController {
         return userService.getInfoDTO();
     }
 
-    
-
     @PutMapping("/info")
     public Result update(@RequestBody UserInfo userInfo) {
         // 更新用户信息
@@ -133,7 +132,5 @@ public class UserController {
         // 更新用户信息
         return userService.updateUser(user);
     }
-
-    
 
 }

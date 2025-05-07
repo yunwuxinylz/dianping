@@ -1,6 +1,5 @@
 package com.dp.service.impl;
 
-import static com.dp.utils.RedisConstants.LOGIN_CODE_KEY;
 import static com.dp.utils.RedisConstants.LOGIN_CODE_TTL;
 import static com.dp.utils.RedisConstants.LOGIN_USER_ID_KEY;
 import static com.dp.utils.RedisConstants.LOGIN_USER_KEY;
