@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  *
  * </p>
  *
- * @since 2021-12-22
+ * 
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -101,7 +101,6 @@ public class Shop implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
 
     @TableField(exist = false)
     private Double distance;

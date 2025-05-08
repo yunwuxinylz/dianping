@@ -11,6 +11,9 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * RabbitMQ配置类
+ */
 @Configuration
 public class RabbitMQConfig {
     public static final String ORDER_EXCHANGE = "order.exchange";

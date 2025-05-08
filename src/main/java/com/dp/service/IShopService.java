@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
  * 服务类
  * </p>
  *
- * @since 2021-12-22
+ * 
  */
 public interface IShopService extends IService<Shop> {
 

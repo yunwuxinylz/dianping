@@ -1,6 +1,5 @@
 package com.dp.controller;
 
-
 import javax.annotation.Resource;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +18,7 @@ import com.dp.service.IVoucherService;
  * 前端控制器
  * </p>
  *
- * @since 2021-12-22
+ * 
  */
 @RestController
 @RequestMapping("/voucher")

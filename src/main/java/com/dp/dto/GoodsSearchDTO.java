@@ -4,6 +4,9 @@ import java.util.List;
 
 import lombok.Data;
 
+/**
+ * 商品搜索DTO
+ */
 @Data
 public class GoodsSearchDTO {
     private Long id;
@@ -14,9 +17,9 @@ public class GoodsSearchDTO {
     private List<String> images;
     private Integer stock;
     private Integer sold;
-    
+
     private Long shopId;
-    
+
     private String shopName;
     private String address;
     private Double distance;

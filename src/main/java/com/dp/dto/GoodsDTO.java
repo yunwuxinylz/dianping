@@ -6,6 +6,9 @@ import java.util.List;
 
 import com.dp.entity.GoodSKU;
 
+/**
+ * 商品DTO
+ */
 @Data
 public class GoodsDTO {
     private Long id;
@@ -17,6 +20,6 @@ public class GoodsDTO {
     private List<String> images;
     private Integer stock;
     private Integer sold;
-    private List<GoodSKU> skus;  // SKU列表
+    private List<GoodSKU> skus; // SKU列表
 
 }

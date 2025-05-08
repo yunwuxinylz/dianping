@@ -12,9 +12,10 @@ import com.dp.service.IBlogCommentsService;
  * 服务实现类
  * </p>
  *
- * @since 2021-12-22
+ * 
  */
 @Service
-public class BlogCommentsServiceImpl extends ServiceImpl<BlogCommentsMapper, BlogComments> implements IBlogCommentsService {
+public class BlogCommentsServiceImpl extends ServiceImpl<BlogCommentsMapper, BlogComments>
+        implements IBlogCommentsService {
 
 }

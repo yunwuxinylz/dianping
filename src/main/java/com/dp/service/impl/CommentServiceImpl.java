@@ -42,7 +42,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     private IOrderService orderService;
 
     @Resource
-    private IOrderItemsService orderItemsService;  // 添加这个依赖
+    private IOrderItemsService orderItemsService; // 添加这个依赖
 
     @Override
     @Transactional
@@ -80,10 +80,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
     /**
      * 获取店铺评价列表
-     * @param shopId 店铺ID
-     * @param current 当前页码
+     * 
+     * @param shopId   店铺ID
+     * @param current  当前页码
      * @param pageSize 每页大小
-     * @param score 评分筛选
+     * @param score    评分筛选
      * @return 评价列表和总数
      */
     @Override
@@ -96,9 +97,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         // 使用数据库分页查询
         Page<Comment> page = this.baseMapper.selectPage(
-            new Page<>(current, pageSize),
-            queryWrapper
-        );
+                new Page<>(current, pageSize),
+                queryWrapper);
 
         // 获取所有评论的订单ID
         List<Long> orderIds = page.getRecords().stream()
@@ -106,13 +106,13 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                 .collect(Collectors.toList());
 
         // 批量查询订单商品信息并按订单ID分组
-        final Map<Long, List<OrderItems>> orderItemsMap = !orderIds.isEmpty() 
-            ? orderItemsService.lambdaQuery()
-                    .in(OrderItems::getOrderId, orderIds)
-                    .list()
-                    .stream()
-                    .collect(Collectors.groupingBy(OrderItems::getOrderId))
-            : new HashMap<>();
+        final Map<Long, List<OrderItems>> orderItemsMap = !orderIds.isEmpty()
+                ? orderItemsService.lambdaQuery()
+                        .in(OrderItems::getOrderId, orderIds)
+                        .list()
+                        .stream()
+                        .collect(Collectors.groupingBy(OrderItems::getOrderId))
+                : new HashMap<>();
 
         // 转换为DTO
         List<CommentDTO> records = page.getRecords().stream().map(comment -> {
@@ -130,12 +130,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             return dto;
         }).collect(Collectors.toList());
 
-        // 构建返回结果
-        Map<String, Object> result = new HashMap<>();
-        result.put("total", page.getTotal());
-        result.put("list", records);
-
-        return Result.ok(result);
+        return Result.ok(records, page.getTotal());
     }
 
     /**

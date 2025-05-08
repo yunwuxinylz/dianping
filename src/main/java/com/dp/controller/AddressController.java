@@ -15,13 +15,16 @@ import com.dp.dto.Result;
 import com.dp.entity.Address;
 import com.dp.service.IAddressService;
 
+/**
+ * 地址控制器
+ */
 @RestController
 @RequestMapping("/address")
 public class AddressController {
 
     @Resource
     private IAddressService addressService;
-    
+
     /**
      * 获取用户地址列表
      */
@@ -29,7 +32,7 @@ public class AddressController {
     public Result list() {
         return addressService.getUserAddresses();
     }
-    
+
     /**
      * 添加新地址
      */
@@ -37,7 +40,7 @@ public class AddressController {
     public Result add(@RequestBody Address address) {
         return addressService.addAddress(address);
     }
-    
+
     /**
      * 更新地址
      */
@@ -45,7 +48,7 @@ public class AddressController {
     public Result update(@RequestBody Address address) {
         return addressService.updateAddress(address);
     }
-    
+
     /**
      * 删除地址
      */
@@ -53,7 +56,7 @@ public class AddressController {
     public Result delete(@PathVariable("id") Long addressId) {
         return addressService.deleteAddress(addressId);
     }
-    
+
     /**
      * 设置默认地址
      */

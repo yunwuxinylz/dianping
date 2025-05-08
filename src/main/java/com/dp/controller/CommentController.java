@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 
+/**
+ * 评论控制器
+ */
 @RestController
 @RequestMapping("/comment")
 public class CommentController {
@@ -16,6 +19,7 @@ public class CommentController {
 
     /**
      * 提交商品评价
+     * 
      * @param commentDTO 评价数据
      * @return 评价结果
      */
@@ -26,10 +30,11 @@ public class CommentController {
 
     /**
      * 获取店铺评价列表
-     * @param shopId 店铺ID
-     * @param current 当前页码
+     * 
+     * @param shopId   店铺ID
+     * @param current  当前页码
      * @param pageSize 每页大小
-     * @param score 评分筛选
+     * @param score    评分筛选
      * @return 评价列表
      */
     @GetMapping("/shop")
@@ -43,6 +48,7 @@ public class CommentController {
 
     /**
      * 检查订单是否已评价
+     * 
      * @param orderId 订单ID
      * @return 是否已评价
      */

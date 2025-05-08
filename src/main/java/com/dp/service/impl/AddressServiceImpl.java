@@ -19,6 +19,9 @@ import com.dp.utils.UserHolder;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 地址服务实现类
+ */
 @Slf4j
 @Service
 public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> implements IAddressService {
@@ -30,22 +33,22 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (user == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 查询用户的所有地址
         List<Address> addresses = lambdaQuery()
-               .eq(Address::getUserId, user.getId())
-               .orderByDesc(Address::getIsDefault, Address::getCreatedAt)
-               .list();
+                .eq(Address::getUserId, user.getId())
+                .orderByDesc(Address::getIsDefault, Address::getCreatedAt)
+                .list();
 
         // DTO转换
         List<AddressDTO> addressesDTO = addresses.stream()
-               .map(address -> {
-                   AddressDTO addressDTO = BeanUtil.copyProperties(address, AddressDTO.class);
-                   return addressDTO;
-               })
-               .collect(Collectors.toList());  // 添加collect操作
-                
-        return Result.ok(addressesDTO);  // 返回DTO列表而不是实体列表
+                .map(address -> {
+                    AddressDTO addressDTO = BeanUtil.copyProperties(address, AddressDTO.class);
+                    return addressDTO;
+                })
+                .collect(Collectors.toList()); // 添加collect操作
+
+        return Result.ok(addressesDTO); // 返回DTO列表而不是实体列表
     }
 
     @Override
@@ -56,19 +59,17 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (user == null) {
             return Result.fail("用户未登录");
         }
-        
 
         // 设置用户ID
         address.setUserId(user.getId());
-        
+
         // 如果是默认地址，将该用户其他地址设为非默认
         if (Boolean.TRUE.equals(address.getIsDefault())) {
             baseMapper.clearDefaultByUserId(user.getId());
         }
 
         save(address);
-        
-        
+
         return Result.ok();
     }
 
@@ -80,7 +81,7 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (user == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 验证地址是否属于当前用户
         Address existingAddress = getById(address.getId());
         if (existingAddress == null) {
@@ -89,15 +90,15 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (!existingAddress.getUserId().equals(user.getId())) {
             return Result.fail("无权修改此地址");
         }
-        
+
         // 如果设置为默认地址，将该用户其他地址设为非默认
         if (Boolean.TRUE.equals(address.getIsDefault()) && !Boolean.TRUE.equals(existingAddress.getIsDefault())) {
             baseMapper.clearDefaultByUserId(user.getId());
         }
-        
+
         // 更新地址
         updateById(address);
-        
+
         return Result.ok();
     }
 
@@ -108,7 +109,7 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (user == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 验证地址是否属于当前用户
         Address existingAddress = getById(addressId);
         if (existingAddress == null) {
@@ -117,10 +118,10 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (!existingAddress.getUserId().equals(user.getId())) {
             return Result.fail("无权删除此地址");
         }
-        
+
         // 删除地址
         removeById(addressId);
-        
+
         return Result.ok();
     }
 
@@ -132,7 +133,7 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (user == null) {
             return Result.fail("用户未登录");
         }
-        
+
         // 验证地址是否属于当前用户
         Address existingAddress = getById(addressId);
         if (existingAddress == null) {
@@ -141,15 +142,15 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         if (!existingAddress.getUserId().equals(user.getId())) {
             return Result.fail("无权操作此地址");
         }
-        
+
         // 将该用户所有地址设置为非默认
         baseMapper.clearDefaultByUserId(user.getId());
-        
+
         // 将当前地址设置为默认
         existingAddress.setIsDefault(true);
         existingAddress.setUpdatedAt(LocalDateTime.now());
         updateById(existingAddress);
-        
+
         return Result.ok();
     }
 

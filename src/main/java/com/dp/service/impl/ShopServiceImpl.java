@@ -174,11 +174,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                 })
                 .collect(Collectors.toList());
 
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", shopDTOList);
-        // 返回数据
-        return Result.ok(map);
+        return Result.ok(shopDTOList, page.getTotal());
     }
 
     @Override
@@ -214,11 +210,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                 })
                 .collect(Collectors.toList());
 
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", shopDTOList);
-        // 返回数据
-        return Result.ok(map);
+        return Result.ok(shopDTOList, page.getTotal());
     }
 
     @Override

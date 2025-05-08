@@ -5,6 +5,9 @@ import java.util.List;
 
 import lombok.Data;
 
+/**
+ * 订单列表DTO
+ */
 @Data
 public class OrderListDTO {
     private Long id;

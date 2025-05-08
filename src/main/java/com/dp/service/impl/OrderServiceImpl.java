@@ -260,11 +260,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     return orderDTO;
                 }).collect(Collectors.toList());
 
-        // 构建结果
-        Map<String, Object> result = new HashMap<>();
-        result.put("list", records);
-        result.put("total", orderPage.getTotal());
-        return Result.ok(result);
+        return Result.ok(records, orderPage.getTotal());
     }
 
     /**

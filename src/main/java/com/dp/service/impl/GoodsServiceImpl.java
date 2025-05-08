@@ -176,12 +176,8 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
                     return goodsDTO;
                 })
                 .collect(Collectors.toList());
-        // map
-        Map<String, Object> map = new HashMap<>();
-        map.put("total", page.getTotal());
-        map.put("list", goodsDTOList); // 修改这里，返回转换后的DTO列表
 
-        return Result.ok(map);
+        return Result.ok(goodsDTOList, page.getTotal());
     }
 
     @Override

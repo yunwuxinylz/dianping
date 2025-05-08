@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  *
  * </p>
  *
- * @since 2021-12-22
+ * 
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -58,6 +58,5 @@ public class ShopType implements Serializable {
      */
     @JsonIgnore
     private LocalDateTime updateTime;
-
 
 }
