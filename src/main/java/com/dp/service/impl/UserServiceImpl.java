@@ -141,6 +141,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     private Result getTokenKey(User user) {
         // 获取用户id
         Long userId = user.getId();
+        // 判断是否为管理员
+        Boolean isAdmin = user.getIsAdmin();
         // 删除该用户的旧token
         String oldToken = stringRedisTemplate.opsForValue().get(LOGIN_USER_ID_KEY + userId);
         if (oldToken != null) {
@@ -164,7 +166,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 设置token有效期
         stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
 
-        return Result.ok(token);
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", token);
+        result.put("isAdmin", isAdmin);
+        return Result.ok(result);
     }
 
     private User createUserWithPhone(RegisterFormDTO registerForm) {

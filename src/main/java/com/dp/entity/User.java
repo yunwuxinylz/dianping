@@ -61,5 +61,9 @@ public class User implements Serializable {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 管理员
+     */
+    private Boolean isAdmin;
 
 }

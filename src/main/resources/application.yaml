@@ -4,10 +4,10 @@ spring:
   application:
     name: dp
   rabbitmq:
-    host: 192.168.11.20
+    host: 47.122.132.206
     port: 5672
-    username: ylz
-    password: ylz021129
+    username: zzb
+    password: zzb123456
     virtual-host: /
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -46,9 +46,9 @@ spring:
       connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
   redis:
     client-name: dp-redis
-    host: 192.168.11.20
+    host: 47.122.132.206
     port: 6379
-    password: ylz021129
+    password: zzb123456
     lettuce:
       pool:
         max-active: 10
@@ -61,8 +61,7 @@ mybatis-plus:
   type-aliases-package: com.dp.entity # 别名扫描包
 logging:
   level:
-    '[com.dp]': debug
-
+    "[com.dp]": debug
 
 management:
   endpoints:
@@ -73,7 +72,7 @@ management:
     health:
       show-details: always
     prometheus:
-      enabled: true  
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}

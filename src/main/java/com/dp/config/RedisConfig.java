@@ -6,14 +6,13 @@ import org.redisson.config.Config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-
 @Configuration
 public class RedisConfig {
     @Bean
-    public RedissonClient redissonClient(){
+    public RedissonClient redissonClient() {
         Config config = new Config();
-        config.useSingleServer().setAddress("redis://192.168.11.20:6379").setPassword("ylz021129");
-        
+        config.useSingleServer().setAddress("redis://47.122.132.206:6379").setPassword("zzb123456");
+
         return Redisson.create(config);
     }
 
