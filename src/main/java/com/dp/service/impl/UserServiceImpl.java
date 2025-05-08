@@ -191,7 +191,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 校验验证码
         String redisCode = stringRedisTemplate.opsForValue().get("code:reset:" + phone);
-        if (code == null ||!code.equals(redisCode)) {
+        if (code == null || !code.equals(redisCode)) {
             return Result.fail("验证码错误");
         }
         // 根据手机号查询用户
@@ -206,7 +206,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         stringRedisTemplate.delete("code:reset:" + phone);
         return Result.ok("密码修改成功");
     }
-    
 
     @Override
     @Transactional
@@ -277,11 +276,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         UserDTO userDTO = UserHolder.getUser();
         // 查询详情
         UserInfo info = userInfoService.getById(userDTO.getId());
-        if (info == null) {
-            // 没有详情，应该是第一次查看详情
-            return Result.ok();
+        UserInfoDTO infoDTO = new UserInfoDTO();
+        if (info != null) {
+            infoDTO = BeanUtil.copyProperties(info, UserInfoDTO.class);
         }
-        UserInfoDTO infoDTO = BeanUtil.copyProperties(info, UserInfoDTO.class);
         infoDTO.setId(userDTO.getId());
         infoDTO.setNickName(userDTO.getNickName());
         infoDTO.setIcon(userDTO.getIcon());
