@@ -108,9 +108,14 @@ public class UserController {
      * @return 无
      */
     @PostMapping("/logout")
-    public Result logout(@RequestParam String phone) {
+    public Result logout(@RequestParam String token) {
+        // 获取当前登录的用户信息
+        Long userId = UserHolder.getUser().getId();
         UserHolder.removeUser();
-        stringRedisTemplate.delete(RedisConstants.LOGIN_CODE_KEY + phone);
+        // 删除redis中的token
+        stringRedisTemplate.delete(RedisConstants.LOGIN_USER_ID_KEY + userId);
+        // 删除redis中的用户信息
+        stringRedisTemplate.delete(RedisConstants.LOGIN_USER_KEY + token);
         return Result.ok("登出成功");
     }
 
