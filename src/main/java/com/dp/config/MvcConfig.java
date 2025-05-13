@@ -8,6 +8,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import javax.annotation.Resource;
+
 /**
  * 拦截器配置
  */
@@ -20,7 +21,7 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(@SuppressWarnings("null") InterceptorRegistry registry) {
-        //登录拦截器
+        // 登录拦截器
         registry.addInterceptor(new LoginInterceptor())
                 .excludePathPatterns(
                         "/shop/**",
@@ -32,9 +33,10 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/user/logout",
                         "/user/register",
                         "/user/reset-password",
-                        "/goods/**"
-                ).order(1);
-        //token刷新的拦截器
+                        "/goods/**",
+                        "/favorite/**")
+                .order(1);
+        // token刷新的拦截器
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).addPathPatterns("/**").order(0);
     }
 }

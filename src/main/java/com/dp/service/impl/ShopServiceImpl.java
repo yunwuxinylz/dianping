@@ -6,7 +6,6 @@ import static com.dp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.dp.utils.RedisConstants.LOCK_SHOP_KEY;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -90,8 +89,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             // 释放锁
             unlock(lockKey);
         }
-
-        // 将店铺信息写入redis
 
         return Result.ok(shop);
     }
