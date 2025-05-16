@@ -27,7 +27,7 @@ import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.mapper.UserMapper;
 import com.dp.service.IUserInfoService;
-import com.dp.service.IUserService;
+import com.dp.service.IUserService; // 确保这是正确的 UserService 接口
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
 
@@ -45,7 +45,10 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService { // 假设继承了 Mybatis-Plus 的 ServiceImpl
+
+    @Resource // 或者 @Autowired
+    private UserMapper userMapper;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -290,4 +293,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok(infoDTO);
     }
 
+    @Override
+    public Result getCount() {
+        try {
+            // 从数据库获取用户总数
+            // 注意：MyBatis-Plus 的 BaseMapper 默认没有 count() 方法，
+            // 你可能需要使用 selectCount(null) 或者在 UserMapper 中自定义一个 count() 方法
+            // 这里我们假设 UserMapper 中有一个自定义的 count() 方法
+            // 或者直接使用 Mybatis-Plus 提供的方法
+            long count = userMapper.selectCount(null); // 使用 Mybatis-Plus 的方法
+            // 如果你自定义了 UserMapper.count()，则使用：
+            // int count = userMapper.count();
+            return Result.ok(count); // 修改：将 Result.success 改为 Result.ok
+        } catch (Exception e) {
+            // 记录日志会更好
+            // log.error("获取用户总数失败", e);
+            return Result.fail("获取用户总数失败"); // 修改：将 Result.error 改为 Result.fail
+        }
+    }
 }

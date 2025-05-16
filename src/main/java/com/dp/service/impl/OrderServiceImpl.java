@@ -63,6 +63,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Resource
     private IOrderItemsService orderItemsService;
 
+    @Resource
+    private OrderMapper orderMapper;
+
     @Override
     @Transactional
     public Long createOrder(OrderCreateDTO orderDTO) {
@@ -503,5 +506,93 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         statistics.setMonthlySpending(monthlySpending);
 
         return Result.ok(statistics);
+    }
+
+    @Override
+    public Result getOrderCount() {
+        try {
+            // 从数据库获取订单总数
+            long count = count(); // 使用 MyBatis-Plus 的 count() 方法
+            return Result.ok(count);
+        } catch (Exception e) {
+            log.error("获取订单总数失败", e);
+            return Result.fail("获取订单总数失败");
+        }
+    }
+
+    @Override
+    public Result getTodaySales() {
+        try {
+            // 获取今天的开始时间和结束时间
+            LocalDateTime today = LocalDate.now().atStartOfDay();
+            LocalDateTime tomorrow = today.plusDays(1);
+            
+            // 查询今日已支付订单的销售额总和
+            // 只统计状态为已支付(2)、待收货(4)和已完成(5)的订单
+            Long todaySales = lambdaQuery()
+                .ge(Order::getCreateTime, today)
+                .lt(Order::getCreateTime, tomorrow)
+                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                .list()
+                .stream()
+                .mapToLong(Order::getAmount)
+                .sum();
+            
+            return Result.ok(todaySales);
+        } catch (Exception e) {
+            log.error("获取今日销售额失败", e);
+            return Result.fail("获取今日销售额失败");
+        }
+    }
+    
+    @Override
+    public Result getWeekSales() {
+        try {
+            // 获取最近7天的日期范围
+            LocalDate today = LocalDate.now();
+            LocalDate sevenDaysAgo = today.minusDays(6); // 包括今天在内的7天
+            LocalDateTime startTime = sevenDaysAgo.atStartOfDay();
+            LocalDateTime endTime = today.plusDays(1).atStartOfDay(); // 今天结束时间
+            
+            // 查询最近7天的订单
+            List<Order> orders = lambdaQuery()
+                .ge(Order::getCreateTime, startTime)
+                .lt(Order::getCreateTime, endTime)
+                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                .list();
+            
+            // 按日期分组计算每天的销售额
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            Map<String, Long> dailySales = new TreeMap<>(); // 使用TreeMap保持日期顺序
+            
+            // 初始化最近7天的每一天
+            for (int i = 6; i >= 0; i--) {
+                String dayStr = today.minusDays(i).format(formatter);
+                dailySales.put(dayStr, 0L);
+            }
+            
+            // 填充每日销售数据
+            orders.forEach(order -> {
+                String dayStr = order.getCreateTime().toLocalDate().format(formatter);
+                if (dailySales.containsKey(dayStr)) {
+                    dailySales.compute(dayStr, (k, v) -> v + order.getAmount());
+                }
+            });
+            
+            // 转换为前端需要的数据格式
+            List<Map<String, Object>> result = dailySales.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("date", entry.getKey());
+                    item.put("sales", entry.getValue());
+                    return item;
+                })
+                .collect(Collectors.toList());
+            
+            return Result.ok(result);
+        } catch (Exception e) {
+            log.error("获取最近7天销售趋势失败", e);
+            return Result.fail("获取最近7天销售趋势失败");
+        }
     }
 }

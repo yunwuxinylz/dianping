@@ -26,4 +26,6 @@ public interface IShopService extends IService<Shop> {
 
     Result shopRecommendList(Integer limit, String sortBy);
 
+    Result getShopTypeStats();
+
 }

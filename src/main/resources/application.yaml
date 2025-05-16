@@ -13,7 +13,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/dp?useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true
     username: root
-    password: 021129
+    password: password
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
       # 初始连接数

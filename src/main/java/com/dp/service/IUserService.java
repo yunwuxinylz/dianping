@@ -29,4 +29,6 @@ public interface IUserService extends IService<User> {
     Result getInfoDTO();
 
     Result resetPassword(String phone, String code, String password);
+
+    Result getCount();
 }

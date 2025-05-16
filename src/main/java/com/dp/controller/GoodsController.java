@@ -85,6 +85,15 @@ public class GoodsController {
 
         return goodsService.goodsRecommendList(count);
     }
+    
+    /**
+     * 获取商品总数
+     * @return 商品总数
+     */
+    @GetMapping("/count")
+    public Result getGoodsCount() {
+        return goodsService.getGoodsCount();
+    }
 
     
 

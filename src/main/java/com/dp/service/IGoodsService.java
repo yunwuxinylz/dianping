@@ -15,4 +15,5 @@ public interface IGoodsService extends IService<Goods> {
     Result updateSold(Long goodsId, Integer count, Long skuId);
     Result goodsSearchList(String name, String sortBy, String sortOrder, Integer pageSize, Integer current);
     Result goodsRecommendList(Integer count);
+    Result getGoodsCount(); // 添加获取商品总数的方法声明
 }

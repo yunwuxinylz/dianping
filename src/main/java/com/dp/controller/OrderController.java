@@ -131,4 +131,31 @@ public class OrderController {
     public Result getOrderStatistics() {
         return orderService.getOrderStatistics();
     }
+
+    /**
+     * 获取订单总数
+     * @return 订单总数
+     */
+    @GetMapping("/count")
+    public Result getOrderCount() {
+        return orderService.getOrderCount();
+    }
+
+     /**
+     * 获取今日销售额
+     * @return 今日销售额
+     */
+    @GetMapping("/today-sales")
+    public Result getTodaySales() {
+        return orderService.getTodaySales();
+    }
+
+    /**
+     * 获取最近7天销售趋势
+     * @return 最近7天销售趋势数据
+     */
+    @GetMapping("/week-sales")
+    public Result getWeekSales() {
+        return orderService.getWeekSales();
+    }
 }

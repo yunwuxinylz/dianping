@@ -21,6 +21,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.Result;
 import com.dp.dto.ShopDTO;
+import com.dp.dto.TypeCountDTO;
 import com.dp.entity.Shop;
 import com.dp.entity.ShopType;
 import com.dp.mapper.ShopMapper;
@@ -31,6 +32,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * <p>
@@ -39,6 +41,7 @@ import cn.hutool.json.JSONUtil;
  *
  */
 @Service
+@Slf4j
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
     @Resource
@@ -240,4 +243,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shopDTOList);
     }
 
+    @Override
+    public Result getShopTypeStats() {
+        try {
+            List<TypeCountDTO> typeCounts = baseMapper.countShopsByType();
+            return Result.ok(typeCounts);
+        } catch (Exception e) {
+            log.error("获取商铺类型统计数据失败", e);
+            return Result.fail("获取商铺类型统计数据失败");
+        }
+    }
 }
