@@ -30,6 +30,8 @@ out/
 # VS Code
 .vscode/
 *.code-workspace
+.trae
+.cursor
 
 ### 日志文件 ###
 logs/
