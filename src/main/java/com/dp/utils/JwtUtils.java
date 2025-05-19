@@ -1,0 +1,101 @@
+package com.dp.utils;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.stereotype.Component;
+
+import com.dp.dto.UserDTO;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+
+@Component
+public class JwtUtils {
+
+    // 用于签名的密钥
+    private final static SecretKey ACCESS_TOKEN_SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    private final static SecretKey REFRESH_TOKEN_SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+
+    // Access Token有效期: 15分钟
+    public static final long ACCESS_TOKEN_EXPIRATION = 15 * 60 * 1000;
+
+    // Refresh Token有效期: 15天
+    public static final long REFRESH_TOKEN_EXPIRATION = 15 * 24 * 60 * 60 * 1000;
+
+    // 创建AccessToken
+    public String generateAccessToken(UserDTO userDTO) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("id", userDTO.getId());
+        claims.put("nickName", userDTO.getNickName());
+        claims.put("icon", userDTO.getIcon());
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(userDTO.getId().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                .signWith(ACCESS_TOKEN_SECRET_KEY)
+                .compact();
+    }
+
+    // 创建RefreshToken
+    public String generateRefreshToken(Long userId) {
+        return Jwts.builder()
+                .setSubject(userId.toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
+                .signWith(REFRESH_TOKEN_SECRET_KEY)
+                .compact();
+    }
+
+    // 从AccessToken中提取UserDTO
+    public UserDTO extractUserFromAccessToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(ACCESS_TOKEN_SECRET_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        UserDTO userDTO = new UserDTO();
+        userDTO.setId(Long.valueOf(claims.getSubject()));
+        userDTO.setNickName((String) claims.get("nickName"));
+        userDTO.setIcon((String) claims.get("icon"));
+        return userDTO;
+    }
+
+    // 从RefreshToken中提取userId
+    public Long extractUserIdFromRefreshToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(REFRESH_TOKEN_SECRET_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return Long.valueOf(claims.getSubject());
+    }
+
+    // 验证AccessToken是否有效
+    public boolean validateAccessToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(ACCESS_TOKEN_SECRET_KEY).build().parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 验证RefreshToken是否有效
+    public boolean validateRefreshToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(REFRESH_TOKEN_SECRET_KEY).build().parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+}

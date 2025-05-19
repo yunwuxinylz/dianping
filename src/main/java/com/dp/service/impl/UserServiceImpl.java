@@ -1,9 +1,6 @@
 package com.dp.service.impl;
 
 import static com.dp.utils.RedisConstants.LOGIN_CODE_TTL;
-import static com.dp.utils.RedisConstants.LOGIN_USER_ID_KEY;
-import static com.dp.utils.RedisConstants.LOGIN_USER_KEY;
-import static com.dp.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.dp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 import java.time.LocalDateTime;
@@ -12,6 +9,9 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Resource;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,13 +28,13 @@ import com.dp.entity.UserInfo;
 import com.dp.mapper.UserMapper;
 import com.dp.service.IUserInfoService;
 import com.dp.service.IUserService;
+import com.dp.utils.JwtUtils;
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -52,6 +52,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     @Resource
     private IUserInfoService userInfoService;
+
+    private final JwtUtils jwtUtils;
+
+    public UserServiceImpl(JwtUtils jwtUtils) {
+        this.jwtUtils = jwtUtils;
+    }
 
     @Override
     public Result sendCode(String phone, String type) {
@@ -71,7 +77,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
-    public Result login(LoginFormDTO loginForm) {
+    public Result login(LoginFormDTO loginForm, HttpServletResponse response) {
         // 校验手机号
         String phone = loginForm.getPhone();
         if (RegexUtils.isPhoneInvalid(phone)) {
@@ -108,7 +114,65 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 删除验证码
         stringRedisTemplate.delete("code:login:" + phone);
 
-        return getTokenKey(user);
+        // 生成双token
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Boolean isAdmin = user.getIsAdmin();
+        String accessToken = jwtUtils.generateAccessToken(userDTO);
+        String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
+
+        // 创建HttpOnly Cookie存储Refresh Token
+        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setSecure(true); // 仅HTTPS
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000)); // 设置刷新token的过期时间15天
+        response.addCookie(refreshTokenCookie);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("accessToken", accessToken);
+        result.put("isAdmin", isAdmin);
+        return Result.ok(result);
+    }
+
+    // 刷新accessToken
+    @Override
+    public Result refreshToken(HttpServletRequest request, HttpServletResponse response) {
+        // 从Cookie中获取Refresh Token
+        Cookie[] cookies = request.getCookies();
+        String refreshToken = null;
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("refreshToken".equals(cookie.getName())) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (StrUtil.isBlank(refreshToken)) {
+            return Result.fail("未找到刷新令牌");
+        }
+
+        // 验证Refresh Token
+        if (!jwtUtils.validateRefreshToken(refreshToken)) {
+            return Result.fail("刷新令牌已过期，请重新登录");
+        }
+
+        // 从Refresh Token中提取用户ID
+        Long userId = jwtUtils.extractUserIdFromRefreshToken(refreshToken);
+
+        // 获取用户信息
+        User user = getById(userId);
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+
+        // 生成新的Access Token
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        String accessToken = jwtUtils.generateAccessToken(userDTO);
+
+        // 返回新的Access Token
+        return Result.ok(accessToken);
     }
 
     // 注册
@@ -135,40 +199,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 删除验证码
         stringRedisTemplate.delete("code:register:" + phone);
         return Result.ok("注册成功");
-    }
-
-    private Result getTokenKey(User user) {
-        // 获取用户id
-        Long userId = user.getId();
-        // 判断是否为管理员
-        Boolean isAdmin = user.getIsAdmin();
-        // 删除该用户的旧token
-        String oldToken = stringRedisTemplate.opsForValue().get(LOGIN_USER_ID_KEY + userId);
-        if (oldToken != null) {
-            stringRedisTemplate.delete(LOGIN_USER_KEY + oldToken);
-            stringRedisTemplate.delete(LOGIN_USER_ID_KEY + userId);
-        }
-
-        // 随机生成新token
-        String token = UUID.randomUUID().toString(true);
-        // 将User对象转为Hash存储
-        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
-                CopyOptions.create()
-                        .setIgnoreNullValue(true)
-                        .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
-        // 存储用户信息
-        String tokenKey = LOGIN_USER_KEY + token;
-        stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
-        // 保存用户id到token的映射
-        stringRedisTemplate.opsForValue().set(LOGIN_USER_ID_KEY + userId, token, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        // 设置token有效期
-        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("isAdmin", isAdmin);
-        return Result.ok(result);
     }
 
     private User createUserWithPhone(RegisterFormDTO registerForm) {

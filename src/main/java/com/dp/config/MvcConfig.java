@@ -1,13 +1,15 @@
 package com.dp.config;
 
-import com.dp.utils.LoginInterceptor;
-import com.dp.utils.RefreshTokenInterceptor;
+import javax.annotation.Resource;
+
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import javax.annotation.Resource;
+import com.dp.utils.JwtUtils;
+import com.dp.utils.LoginInterceptor;
+import com.dp.utils.RefreshTokenInterceptor;
 
 /**
  * 拦截器配置
@@ -17,7 +19,7 @@ import javax.annotation.Resource;
 public class MvcConfig implements WebMvcConfigurer {
 
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private JwtUtils jwtUtils;
 
     @Override
     public void addInterceptors(@SuppressWarnings("null") InterceptorRegistry registry) {
@@ -33,10 +35,12 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/user/logout",
                         "/user/register",
                         "/user/reset-password",
+                        "/user/refresh-token",
                         "/goods/**",
                         "/favorite/**")
                 .order(1);
         // token刷新的拦截器
-        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).addPathPatterns("/**").order(0);
+        registry.addInterceptor(new RefreshTokenInterceptor(jwtUtils)).addPathPatterns("/**")
+                .order(0);
     }
 }

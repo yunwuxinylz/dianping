@@ -1,21 +1,13 @@
 package com.dp.utils;
 
-import static com.dp.utils.RedisConstants.LOGIN_USER_ID_KEY;
-import static com.dp.utils.RedisConstants.LOGIN_USER_TTL;
-
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import com.dp.dto.UserDTO;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 
 /**
@@ -24,46 +16,34 @@ import cn.hutool.core.util.StrUtil;
 @Component
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
-    private final StringRedisTemplate stringRedisTemplate;
+    private final JwtUtils jwtUtils;
 
-    public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
-        this.stringRedisTemplate = stringRedisTemplate;
+    public RefreshTokenInterceptor(JwtUtils jwtUtils) {
+        this.jwtUtils = jwtUtils;
     }
 
     @SuppressWarnings("null")
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
-            throws Exception {
-        // 获取请求头中的token
-        String token = request.getHeader("authorization");
-        if (StrUtil.isBlank(token)) {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // 获取请求头中的Access Token
+        String accessToken = request.getHeader("Authorization");
+        if (StrUtil.isBlank(accessToken)) {
             return true;
         }
-        // 基于TOKEN获取redis中的用户
-        String key = RedisConstants.LOGIN_USER_KEY + token;
-        Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(key);
-        // 判断用户是否存在
-        if (userMap.isEmpty()) {
-            return true;
-        }
-        // 将查询到的Hash数据转为UserDTO对象
-        UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
-        // 存在，保存用户信息到hreadLocal
-        UserHolder.saveUser(userDTO);
-        Long userId = userDTO.getId();
 
-        // 刷新token有效期
-        stringRedisTemplate.expire(key, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        stringRedisTemplate.expire(LOGIN_USER_ID_KEY + userId, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        // 放行
+        // 验证Access Token
+        if (jwtUtils.validateAccessToken(accessToken)) {
+            // Access Token有效，从Access Token中提取用户信息并保存到ThreadLocal
+            UserDTO userDTO = jwtUtils.extractUserFromAccessToken(accessToken);
+            UserHolder.saveUser(userDTO);
+        }
         return true;
     }
 
+    @SuppressWarnings("null")
     @Override
-    public void afterCompletion(@SuppressWarnings("null") HttpServletRequest request,
-            @SuppressWarnings("null") HttpServletResponse response, @SuppressWarnings("null") Object handler,
-            @SuppressWarnings("null") Exception ex) throws Exception {
-
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
+            Exception ex) {
         UserHolder.removeUser();
     }
 }
