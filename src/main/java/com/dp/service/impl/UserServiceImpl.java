@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Resource;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -47,15 +46,16 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private IUserInfoService userInfoService;
+    private final IUserInfoService userInfoService;
 
     private final JwtUtils jwtUtils;
 
-    public UserServiceImpl(JwtUtils jwtUtils) {
+    public UserServiceImpl(StringRedisTemplate stringRedisTemplate, IUserInfoService userInfoService,
+            JwtUtils jwtUtils) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.userInfoService = userInfoService;
         this.jwtUtils = jwtUtils;
     }
 

@@ -2,8 +2,6 @@ package com.dp.controller;
 
 import java.util.List;
 
-import javax.annotation.Resource;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,9 +20,17 @@ import com.dp.service.IShopTypeService;
 @RestController
 @RequestMapping("/shop")
 public class ShopTypeController {
-    @Resource
-    private IShopTypeService typeService;
+    private final IShopTypeService typeService;
 
+    public ShopTypeController(IShopTypeService typeService) {
+        this.typeService = typeService;
+    }
+
+    /**
+     * 查询店铺类型列表
+     * 
+     * @return
+     */
     @GetMapping("/types")
     public Result queryTypeList() {
         List<ShopType> typeList = typeService

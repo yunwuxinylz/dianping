@@ -1,6 +1,5 @@
 package com.dp.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,8 +18,11 @@ import com.dp.service.IVoucherOrderService;
 @RestController
 @RequestMapping("/voucher-order")
 public class VoucherOrderController {
-    @Autowired
-    private IVoucherOrderService voucherOrderService;
+    private final IVoucherOrderService voucherOrderService;
+
+    public VoucherOrderController(IVoucherOrderService voucherOrderService) {
+        this.voucherOrderService = voucherOrderService;
+    }
 
     /**
      * 秒杀优惠券

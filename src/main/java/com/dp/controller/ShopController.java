@@ -1,7 +1,5 @@
 package com.dp.controller;
 
-import javax.annotation.Resource;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,8 +25,11 @@ import com.dp.service.IShopService;
 @RequestMapping("/shop")
 public class ShopController {
 
-    @Resource
-    public IShopService shopService;
+    private final IShopService shopService;
+
+    public ShopController(IShopService shopService) {
+        this.shopService = shopService;
+    }
 
     /**
      * 根据id查询商铺信息

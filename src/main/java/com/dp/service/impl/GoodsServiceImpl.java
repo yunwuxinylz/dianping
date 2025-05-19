@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,12 +29,21 @@ import cn.hutool.core.util.StrUtil;
 @Service
 public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements IGoodsService {
 
-    @Resource
-    private IGoodSKUService goodSKUService;
+    private final IGoodSKUService goodSKUService;
 
-    @Resource
-    private IShopService shopService;
+    private final IShopService shopService;
 
+    public GoodsServiceImpl(IGoodSKUService goodSKUService, IShopService shopService) {
+        this.goodSKUService = goodSKUService;
+        this.shopService = shopService;
+    }
+
+    /**
+     * 根据店铺ID查询商品列表
+     * 
+     * @param shopId
+     * @return
+     */
     @Override
     public List<GoodsDTO> queryGoodsByShopId(Long shopId) {
         // 查询商品列表
@@ -49,6 +56,12 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 根据商品ID查询商品详情
+     * 
+     * @param id
+     * @return
+     */
     @Override
     public GoodsDTO queryGoodsById(Long id) {
         // 查询商品
@@ -69,6 +82,14 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         return goodsDTO;
     }
 
+    /**
+     * 更新库存
+     * 
+     * @param goodsId
+     * @param count
+     * @param skuId
+     * @return
+     */
     @Transactional
     @Override
     public Result updateStock(Long goodsId, Integer count, Long skuId) {
@@ -136,9 +157,18 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         return Result.fail("销量不足");
     }
 
+    /**
+     * 商品搜索列表
+     * 
+     * @param name
+     * @param sortBy
+     * @param sortOrder
+     * @param pageSize
+     * @param current
+     * @return
+     */
     @Override
     public Result goodsSearchList(String name, String sortBy, String sortOrder, Integer pageSize, Integer current) {
-        // 分页查询
         Page<Goods> page = this.query()
                 .like(StrUtil.isNotBlank(name), "name", name)
                 .orderBy(StrUtil.isNotBlank(sortBy),
@@ -180,6 +210,12 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         return Result.ok(goodsDTOList, page.getTotal());
     }
 
+    /**
+     * 商品推荐列表
+     * 
+     * @param count
+     * @return
+     */
     @Override
     public Result goodsRecommendList(Integer count) {
         // 随机获取商品

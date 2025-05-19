@@ -25,6 +25,12 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("upload")
 public class UploadController {
 
+    /**
+     * 删除图片
+     * 
+     * @param filename
+     * @return
+     */
     @DeleteMapping("/delete")
     public Result deleteBlogImg(@RequestParam String filename) {
         File file = new File(SystemConstants.IMAGE_UPLOAD_DIR, filename);
@@ -40,6 +46,13 @@ public class UploadController {
         return Result.ok(file);
     }
 
+    /**
+     * 上传图片
+     * 
+     * @param image
+     * @param type
+     * @return
+     */
     @PostMapping("/save")
     public Result uploadFile(@RequestParam("file") MultipartFile image,
             @RequestParam("type") String type) {
@@ -63,6 +76,13 @@ public class UploadController {
         }
     }
 
+    /**
+     * 创建新文件名
+     * 
+     * @param originalFilename
+     * @param type
+     * @return
+     */
     private String createNewFileName(String originalFilename, String type) {
         // 获取后缀，并确保后缀安全有效
         String suffix = StrUtil.subAfter(originalFilename, ".", true);

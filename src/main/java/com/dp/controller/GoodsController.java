@@ -3,9 +3,6 @@ package com.dp.controller;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.Resource;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -17,17 +14,16 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dp.dto.GoodsDTO;
 import com.dp.dto.Result;
 import com.dp.service.IGoodsService;
-import com.dp.service.IShopService;
 
 // 商品Controller
 @RestController
 @RequestMapping("/goods")
 public class GoodsController {
-    @Autowired
-    private IGoodsService goodsService;
+    private final IGoodsService goodsService;
 
-    @Resource
-    private IShopService shopService;
+    public GoodsController(IGoodsService goodsService) {
+        this.goodsService = goodsService;
+    }
 
     /**
      * 根据店铺id查询商品列表
@@ -85,8 +81,6 @@ public class GoodsController {
 
         return goodsService.goodsRecommendList(count);
     }
-
-    
 
     /**
      * 更新库存

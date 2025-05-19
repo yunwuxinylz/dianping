@@ -1,7 +1,5 @@
 package com.dp.config;
 
-import javax.annotation.Resource;
-
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -17,8 +15,11 @@ import com.dp.utils.RefreshTokenInterceptor;
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {
 
-        @Resource
-        private JwtUtils jwtUtils;
+        private final JwtUtils jwtUtils;
+
+        public MvcConfig(JwtUtils jwtUtils) {
+                this.jwtUtils = jwtUtils;
+        }
 
         @Override
         public void addInterceptors(@SuppressWarnings("null") InterceptorRegistry registry) {

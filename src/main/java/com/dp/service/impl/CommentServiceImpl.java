@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +36,21 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements ICommentService {
 
-    @Resource
-    private IOrderService orderService;
+    private final IOrderService orderService;
 
-    @Resource
-    private IOrderItemsService orderItemsService; // 添加这个依赖
+    private final IOrderItemsService orderItemsService;
 
+    public CommentServiceImpl(IOrderService orderService, IOrderItemsService orderItemsService) {
+        this.orderService = orderService;
+        this.orderItemsService = orderItemsService;
+    }
+
+    /**
+     * 提交评价
+     * 
+     * @param commentDTO
+     * @return
+     */
     @Override
     @Transactional
     public Result submitComment(CommentDTO commentDTO) {

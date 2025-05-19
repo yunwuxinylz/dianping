@@ -12,10 +12,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.TreeMap;
-
-import javax.annotation.Resource;
+import java.util.stream.Collectors;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -47,21 +45,24 @@ import com.dp.utils.UserHolder;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.extern.slf4j.Slf4j;
 
-// 订单Service实现
+/**
+ * 订单Service实现
+ */
 @Service
 @Slf4j
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
-    @Resource
-    private IGoodsService goodsService;
+    private final IGoodsService goodsService;
+    private final IOrderItemsService orderItemsService;
+    private final RabbitTemplate rabbitTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private RabbitTemplate rabbitTemplate;
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private IOrderItemsService orderItemsService;
+    public OrderServiceImpl(IGoodsService goodsService, IOrderItemsService orderItemsService,
+            RabbitTemplate rabbitTemplate, StringRedisTemplate stringRedisTemplate) {
+        this.goodsService = goodsService;
+        this.orderItemsService = orderItemsService;
+        this.rabbitTemplate = rabbitTemplate;
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
 
     @Override
     @Transactional

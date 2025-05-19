@@ -5,8 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -26,9 +24,18 @@ import cn.hutool.core.bean.BeanUtil;
 @Service
 public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> implements IFavoriteService {
 
-    @Resource
-    private IShopTypeService shopTypeService;
+    private final IShopTypeService shopTypeService;
 
+    public FavoriteService(IShopTypeService shopTypeService) {
+        this.shopTypeService = shopTypeService;
+    }
+
+    /**
+     * 添加收藏
+     * 
+     * @param shop
+     * @return
+     */
     @Override
     public Result addFavorite(Shop shop) {
         Long userId = UserHolder.getUser().getId();
@@ -63,6 +70,12 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
         return Result.ok();
     }
 
+    /**
+     * 删除收藏
+     * 
+     * @param shopId
+     * @return
+     */
     @Override
     public Result deleteFavorite(Long shopId) {
         Long userId = UserHolder.getUser().getId();
@@ -74,6 +87,11 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
         return Result.ok();
     }
 
+    /**
+     * 获取收藏列表
+     * 
+     * @return
+     */
     @Override
     public Result listFavorite() {
         Long userId = UserHolder.getUser().getId();

@@ -2,12 +2,10 @@ package com.dp.controller;
 
 import java.util.Map;
 
-import javax.annotation.Resource;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,7 +18,6 @@ import com.dp.dto.RegisterFormDTO;
 import com.dp.dto.Result;
 import com.dp.entity.User;
 import com.dp.entity.UserInfo;
-import com.dp.service.IUserInfoService;
 import com.dp.service.IUserService;
 import com.dp.utils.UserHolder;
 
@@ -39,14 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/user")
 public class UserController {
 
-    @Resource
-    private IUserService userService;
+    private final IUserService userService;
 
-    @Resource
-    private IUserInfoService userInfoService;
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    public UserController(IUserService userService) {
+        this.userService = userService;
+    }
 
     /**
      * 发送手机验证码

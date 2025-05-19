@@ -1,7 +1,5 @@
 package com.dp.controller;
 
-import javax.annotation.Resource;
-
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,8 +16,11 @@ import com.dp.service.IFavoriteService;
 @RequestMapping("/favorite")
 public class FavoriteController {
 
-    @Resource
-    private IFavoriteService favoriteService;
+    private final IFavoriteService favoriteService;
+
+    public FavoriteController(IFavoriteService favoriteService) {
+        this.favoriteService = favoriteService;
+    }
 
     @PostMapping("/add")
     public Result addFavorite(@RequestBody Shop shop) {
