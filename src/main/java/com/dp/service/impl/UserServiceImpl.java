@@ -30,6 +30,7 @@ import com.dp.service.IUserService;
 import com.dp.utils.JwtUtils;
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
+import com.dp.utils.PasswordEncoder;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.RandomUtil;
@@ -99,7 +100,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (password != null) {
             // 校验密码
             String userPassword = user.getPassword();
-            if (!userPassword.equals(password)) {
+            if (!PasswordEncoder.matches(password, userPassword)) {
                 return Result.fail("密码错误");
             }
         }
@@ -204,10 +205,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     private User createUserWithPhone(RegisterFormDTO registerForm) {
         User user = new User();
         user.setPhone(registerForm.getPhone());
-        user.setPassword(registerForm.getPassword());
+        user.setPassword(PasswordEncoder.encode(registerForm.getPassword()));
         user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
         save(user);
-        return user; // 修改：返回创建的用户对象，而不是null
+        return user;
     }
 
     /**
@@ -234,7 +235,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("用户不存在");
         }
         // 更新用户密码
-        user.setPassword(password);
+        user.setPassword(PasswordEncoder.encode(password));
         updateById(user);
         // 删除验证码
         stringRedisTemplate.delete("code:reset:" + phone);
