@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.FavoriteDTO;
 import com.dp.dto.Result;
+import com.dp.dto.UserDTO;
 import com.dp.entity.Shop;
 import com.dp.entity.ShopFavorite;
 import com.dp.entity.ShopType;
@@ -38,9 +39,9 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
      */
     @Override
     public Result addFavorite(Shop shop) {
-        Long userId = UserHolder.getUser().getId();
+        UserDTO user = UserHolder.getUser();
 
-        if (userId == null) {
+        if (user == null) {
             return Result.fail("请先登录");
         }
 
@@ -53,7 +54,7 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
 
         ShopFavorite shopFavorite = new ShopFavorite();
         shopFavorite.setShopId(shop.getId());
-        shopFavorite.setUserId(userId);
+        shopFavorite.setUserId(user.getId());
         shopFavorite.setAddress(shop.getAddress());
         shopFavorite.setArea(shop.getArea());
         shopFavorite.setAvgPrice(shop.getAvgPrice());
@@ -78,12 +79,12 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
      */
     @Override
     public Result deleteFavorite(Long shopId) {
-        Long userId = UserHolder.getUser().getId();
-        if (userId == null) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
             return Result.fail("请先登录");
         }
         this.remove(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shopId)
-                .eq(ShopFavorite::getUserId, userId));
+                .eq(ShopFavorite::getUserId, user.getId()));
         return Result.ok();
     }
 
@@ -94,12 +95,12 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
      */
     @Override
     public Result listFavorite() {
-        Long userId = UserHolder.getUser().getId();
-        if (userId == null) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
             return Result.fail("请先登录");
         }
         List<ShopFavorite> shopFavorites = this.list(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getUserId,
-                userId));
+                user.getId()));
 
         if (shopFavorites.isEmpty()) {
             return Result.ok(Collections.emptyList());
