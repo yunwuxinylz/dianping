@@ -12,6 +12,8 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +30,9 @@ import com.dp.mapper.UserMapper;
 import com.dp.service.IUserInfoService;
 import com.dp.service.IUserService;
 import com.dp.utils.JwtUtils;
+import com.dp.utils.PasswordEncoder;
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
-import com.dp.utils.PasswordEncoder;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.RandomUtil;
@@ -53,11 +55,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     private final JwtUtils jwtUtils;
 
+    private final RedissonClient redissonClient;
+
     public UserServiceImpl(StringRedisTemplate stringRedisTemplate, IUserInfoService userInfoService,
-            JwtUtils jwtUtils) {
+            JwtUtils jwtUtils, RedissonClient redissonClient) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.userInfoService = userInfoService;
         this.jwtUtils = jwtUtils;
+        this.redissonClient = redissonClient;
     }
 
     @Override
@@ -78,7 +83,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
-    public Result login(LoginFormDTO loginForm, HttpServletResponse response) {
+    public Result login(LoginFormDTO loginForm, HttpServletResponse response, HttpServletRequest request) {
         // 校验手机号
         String phone = loginForm.getPhone();
         if (RegexUtils.isPhoneInvalid(phone)) {
@@ -121,12 +126,72 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String accessToken = jwtUtils.generateAccessToken(userDTO);
         String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
 
+        // 登录时存储多设备指纹
+        String deviceId = request.getHeader("X-Device-ID");
+        String userAgent = request.getHeader("User-Agent");
+        String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+        // 创建分布式锁
+        String lockKey = "lock:user:devices:" + userDTO.getId();
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // 尝试获取锁，最多等待1秒，锁自动释放时间10秒
+            boolean locked = lock.tryLock(1, 10, TimeUnit.SECONDS);
+
+            if (locked) {
+                // 获取设备列表
+                String deviceKey = "devices:" + userDTO.getId();
+                Map<Object, Object> deviceMap = stringRedisTemplate.opsForHash().entries(deviceKey);
+
+                // 检查当前设备是否已经登录
+                boolean deviceExists = deviceMap.containsKey(deviceFingerprint);
+                LocalDateTime now = LocalDateTime.now();
+
+                if (deviceExists) {
+                    // 设备已登录，更新时间
+                    stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+                } else {
+                    // 设备不存在，检查是否超过最大设备数(3)
+                    if (deviceMap.size() >= 3) {
+                        // 找出最早登录的设备
+                        String oldestDevice = deviceMap.entrySet().stream()
+                                .min((e1, e2) -> ((String) e1.getValue()).compareTo((String) e2.getValue()))
+                                .map(e -> (String) e.getKey())
+                                .orElse(null);
+
+                        if (oldestDevice != null) {
+                            log.info("用户[{}]超出最大设备数量限制，移除最早登录设备: {}", userDTO.getId(), oldestDevice);
+                            stringRedisTemplate.opsForHash().delete(deviceKey, oldestDevice);
+                        }
+                    }
+
+                    // 添加新设备
+                    stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+                }
+
+                // 设置过期时间
+                stringRedisTemplate.expire(deviceKey, JwtUtils.REFRESH_TOKEN_EXPIRATION, TimeUnit.MILLISECONDS);
+            } else {
+                log.warn("用户[{}]登录时锁获取超时", userDTO.getId());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取锁过程被中断", e);
+        } finally {
+            // 释放锁，只有持有锁的线程才能释放
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+
         // 创建HttpOnly Cookie存储Refresh Token
         Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
         refreshTokenCookie.setHttpOnly(true);
         refreshTokenCookie.setSecure(true); // 仅HTTPS
-        refreshTokenCookie.setPath("/");
-        refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000)); // 设置刷新token的过期时间15天
+        refreshTokenCookie.setPath("/api/user/refresh-token");
+        refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
+
         response.addCookie(refreshTokenCookie);
 
         Map<String, Object> result = new HashMap<>();
@@ -166,6 +231,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         User user = getById(userId);
         if (user == null) {
             return Result.fail("用户不存在");
+        }
+
+        // 验证设备指纹
+        String deviceId = request.getHeader("X-Device-ID");
+        String userAgent = request.getHeader("User-Agent");
+        String currentFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+        // 检查此设备是否在已授权设备列表中
+        Boolean isKnownDevice = stringRedisTemplate.opsForHash().hasKey("devices:" + userId, currentFingerprint);
+
+        if (Boolean.FALSE.equals(isKnownDevice)) {
+            // 可选：记录可疑的刷新令牌尝试
+            log.warn("未授权设备尝试刷新令牌: userId={}, fingerprint={}", userId, currentFingerprint);
+            return Result.fail("设备未授权，请重新登录");
         }
 
         // 生成新的Access Token
@@ -320,5 +399,4 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         infoDTO.setIcon(userDTO.getIcon());
         return Result.ok(infoDTO);
     }
-
 }

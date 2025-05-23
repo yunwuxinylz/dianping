@@ -20,9 +20,11 @@ import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.service.IUserService;
 import com.dp.utils.UserHolder;
+import com.dp.utils.JwtUtils;
 
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * <p>
@@ -37,9 +39,13 @@ import lombok.extern.slf4j.Slf4j;
 public class UserController {
 
     private final IUserService userService;
+    private final JwtUtils jwtUtils;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    public UserController(IUserService userService) {
+    public UserController(IUserService userService, JwtUtils jwtUtils, StringRedisTemplate stringRedisTemplate) {
         this.userService = userService;
+        this.jwtUtils = jwtUtils;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     /**
@@ -64,10 +70,11 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO loginForm, HttpServletResponse response) {
+    public Result login(@RequestBody LoginFormDTO loginForm, HttpServletResponse response,
+            HttpServletRequest request) {
         // 实现登录功能
 
-        return userService.login(loginForm, response);
+        return userService.login(loginForm, response, request);
     }
 
     /**
@@ -117,7 +124,6 @@ public class UserController {
      */
     @PostMapping("/logout")
     public Result logout(HttpServletRequest request, HttpServletResponse response) {
-
         // 获取当前登录的用户信息
         Long userId = UserHolder.getUser().getId();
 
@@ -126,10 +132,19 @@ public class UserController {
             return Result.fail("用户未登录");
         }
 
+        // 清除设备指纹
+        String deviceId = request.getHeader("X-Device-ID");
+        String userAgent = request.getHeader("User-Agent");
+        String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+        // 从设备列表中删除
+        String deviceKey = "devices:" + userId;
+        stringRedisTemplate.opsForHash().delete(deviceKey, deviceFingerprint);
+
         // 清除Refresh Token Cookie
         Cookie cookie = new Cookie("refreshToken", null);
         cookie.setMaxAge(0);
-        cookie.setPath("/");
+        cookie.setPath("/api/user/refresh-token");
         cookie.setHttpOnly(true);
         cookie.setSecure(true);
         response.addCookie(cookie);

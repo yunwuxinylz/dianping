@@ -47,7 +47,8 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
 
         // 判断是否已收藏
         ShopFavorite favorite = this
-                .getOne(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shop.getId()));
+                .getOne(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shop.getId())
+                        .eq(ShopFavorite::getUserId, user.getId()));
         if (favorite != null) {
             return Result.fail("已收藏");
         }

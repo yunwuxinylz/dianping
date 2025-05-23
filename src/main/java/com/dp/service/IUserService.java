@@ -21,7 +21,7 @@ public interface IUserService extends IService<User> {
 
     Result sendCode(String phone, String type);
 
-    Result login(LoginFormDTO loginForm, HttpServletResponse response);
+    Result login(LoginFormDTO loginForm, HttpServletResponse response, HttpServletRequest request);
 
     Result register(RegisterFormDTO registerForm);
 

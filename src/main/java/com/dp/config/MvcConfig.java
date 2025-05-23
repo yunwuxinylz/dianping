@@ -36,8 +36,7 @@ public class MvcConfig implements WebMvcConfigurer {
                                                 "/user/register",
                                                 "/user/reset-password",
                                                 "/user/refresh-token",
-                                                "/goods/**",
-                                                "/favorite/**")
+                                                "/goods/**")
                                 .order(1);
                 // token刷新的拦截器
                 registry.addInterceptor(new RefreshTokenInterceptor(jwtUtils)).addPathPatterns("/**")

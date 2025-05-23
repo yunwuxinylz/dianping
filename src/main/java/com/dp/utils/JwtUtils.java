@@ -7,6 +7,7 @@ import java.util.Map;
 import javax.crypto.SecretKey;
 
 import org.springframework.stereotype.Component;
+import org.springframework.util.DigestUtils;
 
 import com.dp.dto.UserDTO;
 
@@ -23,7 +24,7 @@ public class JwtUtils {
     private final static SecretKey REFRESH_TOKEN_SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
     // Access Token有效期: 15分钟
-    public static final long ACCESS_TOKEN_EXPIRATION = 15 * 60 * 1000;
+    public static final long ACCESS_TOKEN_EXPIRATION = 10 * 1000;
 
     // Refresh Token有效期: 15天
     public static final long REFRESH_TOKEN_EXPIRATION = 15 * 24 * 60 * 60 * 1000;
@@ -97,5 +98,12 @@ public class JwtUtils {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    // 生成设备指纹
+    public String generateDeviceFingerprint(String deviceId, String userAgent, String ipAddress) {
+        // 组合设备信息并哈希
+        String deviceInfo = deviceId + ":" + userAgent + ":" + ipAddress;
+        return DigestUtils.md5DigestAsHex(deviceInfo.getBytes());
     }
 }
