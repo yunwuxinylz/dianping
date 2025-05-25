@@ -243,4 +243,18 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
 
         return Result.ok(goodsDTOList);
     }
+
+    @Override
+    public Result getGoodsCount() {
+        try {
+            // 从数据库获取商品总数
+            // 使用 MyBatis-Plus 的 selectCount 方法
+            long count = count(); // 或者 goodsMapper.selectCount(null);
+            return Result.ok(count); // 使用 Result.ok 而不是 Result.success
+        } catch (Exception e) {
+            // 记录日志会更好
+            // log.error("获取商品总数失败", e);
+            return Result.fail("获取商品总数失败"); // 使用 Result.fail 而不是 Result.error
+        }
+    }
 }

@@ -26,4 +26,10 @@ public interface IOrderService extends IService<Order> {
     Result confirmOrder(Long orderId);
 
     Result getOrderStatistics();
+
+    Result getOrderCount();
+
+    Result getTodaySales();
+
+    Result getWeekSales();
 }

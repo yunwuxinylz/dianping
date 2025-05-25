@@ -171,4 +171,8 @@ public class UserController {
         return userService.updateUser(user);
     }
 
+    // @GetMapping("/count")
+    // public Result getCount() {
+    //     return userService.getCount();
+    // }
 }

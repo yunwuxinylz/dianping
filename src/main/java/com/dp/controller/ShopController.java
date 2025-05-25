@@ -142,4 +142,13 @@ public class ShopController {
         return shopService.shopRecommendList(limit, sortBy);
     }
 
+    /**
+     * 获取商铺类型统计数据
+     * @return 商铺类型统计数据
+     */
+    @GetMapping("/type-stats")
+    public Result getShopTypeStats() {
+        return shopService.getShopTypeStats();
+    }
+
 }
