@@ -26,6 +26,11 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> implements IAddressService {
 
+    /**
+     * 获取用户地址列表
+     * 
+     * @return
+     */
     @Override
     public Result getUserAddresses() {
         // 获取当前登录用户
@@ -51,6 +56,12 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         return Result.ok(addressesDTO); // 返回DTO列表而不是实体列表
     }
 
+    /**
+     * 添加地址
+     * 
+     * @param address
+     * @return
+     */
     @Override
     @Transactional
     public Result addAddress(Address address) {
@@ -73,6 +84,12 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         return Result.ok();
     }
 
+    /**
+     * 更新地址
+     * 
+     * @param address
+     * @return
+     */
     @Override
     @Transactional
     public Result updateAddress(Address address) {
@@ -102,6 +119,12 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         return Result.ok();
     }
 
+    /**
+     * 删除地址
+     * 
+     * @param addressId
+     * @return
+     */
     @Override
     public Result deleteAddress(Long addressId) {
         // 获取当前登录用户
@@ -125,6 +148,12 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         return Result.ok();
     }
 
+    /**
+     * 设置默认地址
+     * 
+     * @param addressId
+     * @return
+     */
     @Override
     @Transactional
     public Result setDefaultAddress(Long addressId) {

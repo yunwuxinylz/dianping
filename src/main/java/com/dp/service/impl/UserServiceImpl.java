@@ -1,9 +1,6 @@
 package com.dp.service.impl;
 
 import static com.dp.utils.RedisConstants.LOGIN_CODE_TTL;
-import static com.dp.utils.RedisConstants.LOGIN_USER_ID_KEY;
-import static com.dp.utils.RedisConstants.LOGIN_USER_KEY;
-import static com.dp.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.dp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 import java.time.LocalDateTime;
@@ -11,8 +8,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Resource;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,14 +28,15 @@ import com.dp.entity.User;
 import com.dp.entity.UserInfo;
 import com.dp.mapper.UserMapper;
 import com.dp.service.IUserInfoService;
-import com.dp.service.IUserService; // 确保这是正确的 UserService 接口
+import com.dp.service.IUserService;
+import com.dp.utils.JwtUtils;
+import com.dp.utils.PasswordEncoder;
 import com.dp.utils.RegexUtils;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -45,16 +47,23 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService { // 假设继承了 Mybatis-Plus 的 ServiceImpl
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
-    @Resource // 或者 @Autowired
-    private UserMapper userMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final IUserInfoService userInfoService;
 
-    @Resource
-    private IUserInfoService userInfoService;
+    private final JwtUtils jwtUtils;
+
+    private final RedissonClient redissonClient;
+
+    public UserServiceImpl(StringRedisTemplate stringRedisTemplate, IUserInfoService userInfoService,
+            JwtUtils jwtUtils, RedissonClient redissonClient) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.userInfoService = userInfoService;
+        this.jwtUtils = jwtUtils;
+        this.redissonClient = redissonClient;
+    }
 
     @Override
     public Result sendCode(String phone, String type) {
@@ -74,7 +83,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
-    public Result login(LoginFormDTO loginForm) {
+    public Result login(LoginFormDTO loginForm, HttpServletResponse response, HttpServletRequest request) {
         // 校验手机号
         String phone = loginForm.getPhone();
         if (RegexUtils.isPhoneInvalid(phone)) {
@@ -96,7 +105,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (password != null) {
             // 校验密码
             String userPassword = user.getPassword();
-            if (!userPassword.equals(password)) {
+            if (!PasswordEncoder.matches(password, userPassword)) {
                 return Result.fail("密码错误");
             }
         }
@@ -111,7 +120,139 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 删除验证码
         stringRedisTemplate.delete("code:login:" + phone);
 
-        return getTokenKey(user);
+        // 生成双token
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Boolean isAdmin = user.getIsAdmin();
+        String accessToken = jwtUtils.generateAccessToken(userDTO);
+        String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
+
+        // 登录时存储多设备指纹
+        String deviceId = request.getHeader("X-Device-ID");
+        String userAgent = request.getHeader("User-Agent");
+        String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+        // 创建分布式锁
+        String lockKey = "lock:user:devices:" + userDTO.getId();
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // 尝试获取锁，最多等待1秒，锁自动释放时间10秒
+            boolean locked = lock.tryLock(1, 10, TimeUnit.SECONDS);
+
+            if (locked) {
+                // 获取设备列表
+                String deviceKey = "devices:" + userDTO.getId();
+                Map<Object, Object> deviceMap = stringRedisTemplate.opsForHash().entries(deviceKey);
+
+                // 检查当前设备是否已经登录
+                boolean deviceExists = deviceMap.containsKey(deviceFingerprint);
+                LocalDateTime now = LocalDateTime.now();
+
+                if (deviceExists) {
+                    // 设备已登录，更新时间
+                    stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+                } else {
+                    // 设备不存在，检查是否超过最大设备数(3)
+                    if (deviceMap.size() >= 3) {
+                        // 找出最早登录的设备
+                        String oldestDevice = deviceMap.entrySet().stream()
+                                .min((e1, e2) -> ((String) e1.getValue()).compareTo((String) e2.getValue()))
+                                .map(e -> (String) e.getKey())
+                                .orElse(null);
+
+                        if (oldestDevice != null) {
+                            log.info("用户[{}]超出最大设备数量限制，移除最早登录设备: {}", userDTO.getId(), oldestDevice);
+                            stringRedisTemplate.opsForHash().delete(deviceKey, oldestDevice);
+                        }
+                    }
+
+                    // 添加新设备
+                    stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+                }
+
+                // 设置过期时间
+                stringRedisTemplate.expire(deviceKey, JwtUtils.REFRESH_TOKEN_EXPIRATION, TimeUnit.MILLISECONDS);
+            } else {
+                log.warn("用户[{}]登录时锁获取超时", userDTO.getId());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取锁过程被中断", e);
+        } finally {
+            // 释放锁，只有持有锁的线程才能释放
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+
+        // 创建HttpOnly Cookie存储Refresh Token
+        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setSecure(true); // 仅HTTPS
+        refreshTokenCookie.setPath("/api/user/refresh-token");
+        refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
+
+        response.addCookie(refreshTokenCookie);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("accessToken", accessToken);
+        result.put("isAdmin", isAdmin);
+        return Result.ok(result);
+    }
+
+    // 刷新accessToken
+    @Override
+    public Result refreshToken(HttpServletRequest request, HttpServletResponse response) {
+        // 从Cookie中获取Refresh Token
+        Cookie[] cookies = request.getCookies();
+        String refreshToken = null;
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("refreshToken".equals(cookie.getName())) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (StrUtil.isBlank(refreshToken)) {
+            return Result.fail("未找到刷新令牌");
+        }
+
+        // 验证Refresh Token
+        if (!jwtUtils.validateRefreshToken(refreshToken)) {
+            return Result.fail("刷新令牌已过期，请重新登录");
+        }
+
+        // 从Refresh Token中提取用户ID
+        Long userId = jwtUtils.extractUserIdFromRefreshToken(refreshToken);
+
+        // 获取用户信息
+        User user = getById(userId);
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+
+        // 验证设备指纹
+        String deviceId = request.getHeader("X-Device-ID");
+        String userAgent = request.getHeader("User-Agent");
+        String currentFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+        // 检查此设备是否在已授权设备列表中
+        Boolean isKnownDevice = stringRedisTemplate.opsForHash().hasKey("devices:" + userId, currentFingerprint);
+
+        if (Boolean.FALSE.equals(isKnownDevice)) {
+            // 可选：记录可疑的刷新令牌尝试
+            log.warn("未授权设备尝试刷新令牌: userId={}, fingerprint={}", userId, currentFingerprint);
+            return Result.fail("设备未授权，请重新登录");
+        }
+
+        // 生成新的Access Token
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        String accessToken = jwtUtils.generateAccessToken(userDTO);
+
+        // 返回新的Access Token
+        return Result.ok(accessToken);
     }
 
     // 注册
@@ -140,47 +281,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok("注册成功");
     }
 
-    private Result getTokenKey(User user) {
-        // 获取用户id
-        Long userId = user.getId();
-        // 判断是否为管理员
-        Boolean isAdmin = user.getIsAdmin();
-        // 删除该用户的旧token
-        String oldToken = stringRedisTemplate.opsForValue().get(LOGIN_USER_ID_KEY + userId);
-        if (oldToken != null) {
-            stringRedisTemplate.delete(LOGIN_USER_KEY + oldToken);
-            stringRedisTemplate.delete(LOGIN_USER_ID_KEY + userId);
-        }
-
-        // 随机生成新token
-        String token = UUID.randomUUID().toString(true);
-        // 将User对象转为Hash存储
-        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
-                CopyOptions.create()
-                        .setIgnoreNullValue(true)
-                        .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
-        // 存储用户信息
-        String tokenKey = LOGIN_USER_KEY + token;
-        stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
-        // 保存用户id到token的映射
-        stringRedisTemplate.opsForValue().set(LOGIN_USER_ID_KEY + userId, token, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        // 设置token有效期
-        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("isAdmin", isAdmin);
-        return Result.ok(result);
-    }
-
     private User createUserWithPhone(RegisterFormDTO registerForm) {
         User user = new User();
         user.setPhone(registerForm.getPhone());
-        user.setPassword(registerForm.getPassword());
+        user.setPassword(PasswordEncoder.encode(registerForm.getPassword()));
         user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
         save(user);
-        return user; // 修改：返回创建的用户对象，而不是null
+        return user;
     }
 
     /**
@@ -207,7 +314,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("用户不存在");
         }
         // 更新用户密码
-        user.setPassword(password);
+        user.setPassword(PasswordEncoder.encode(password));
         updateById(user);
         // 删除验证码
         stringRedisTemplate.delete("code:reset:" + phone);
@@ -291,24 +398,5 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         infoDTO.setNickName(userDTO.getNickName());
         infoDTO.setIcon(userDTO.getIcon());
         return Result.ok(infoDTO);
-    }
-
-    @Override
-    public Result getCount() {
-        try {
-            // 从数据库获取用户总数
-            // 注意：MyBatis-Plus 的 BaseMapper 默认没有 count() 方法，
-            // 你可能需要使用 selectCount(null) 或者在 UserMapper 中自定义一个 count() 方法
-            // 这里我们假设 UserMapper 中有一个自定义的 count() 方法
-            // 或者直接使用 Mybatis-Plus 提供的方法
-            long count = userMapper.selectCount(null); // 使用 Mybatis-Plus 的方法
-            // 如果你自定义了 UserMapper.count()，则使用：
-            // int count = userMapper.count();
-            return Result.ok(count); // 修改：将 Result.success 改为 Result.ok
-        } catch (Exception e) {
-            // 记录日志会更好
-            // log.error("获取用户总数失败", e);
-            return Result.fail("获取用户总数失败"); // 修改：将 Result.error 改为 Result.fail
-        }
     }
 }

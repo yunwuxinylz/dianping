@@ -5,14 +5,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.FavoriteDTO;
 import com.dp.dto.Result;
+import com.dp.dto.UserDTO;
 import com.dp.entity.Shop;
 import com.dp.entity.ShopFavorite;
 import com.dp.entity.ShopType;
@@ -26,27 +25,37 @@ import cn.hutool.core.bean.BeanUtil;
 @Service
 public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> implements IFavoriteService {
 
-    @Resource
-    private IShopTypeService shopTypeService;
+    private final IShopTypeService shopTypeService;
 
+    public FavoriteService(IShopTypeService shopTypeService) {
+        this.shopTypeService = shopTypeService;
+    }
+
+    /**
+     * 添加收藏
+     * 
+     * @param shop
+     * @return
+     */
     @Override
     public Result addFavorite(Shop shop) {
-        Long userId = UserHolder.getUser().getId();
+        UserDTO user = UserHolder.getUser();
 
-        if (userId == null) {
+        if (user == null) {
             return Result.fail("请先登录");
         }
 
         // 判断是否已收藏
         ShopFavorite favorite = this
-                .getOne(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shop.getId()));
+                .getOne(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shop.getId())
+                        .eq(ShopFavorite::getUserId, user.getId()));
         if (favorite != null) {
             return Result.fail("已收藏");
         }
 
         ShopFavorite shopFavorite = new ShopFavorite();
         shopFavorite.setShopId(shop.getId());
-        shopFavorite.setUserId(userId);
+        shopFavorite.setUserId(user.getId());
         shopFavorite.setAddress(shop.getAddress());
         shopFavorite.setArea(shop.getArea());
         shopFavorite.setAvgPrice(shop.getAvgPrice());
@@ -63,25 +72,36 @@ public class FavoriteService extends ServiceImpl<FavoriteMapper, ShopFavorite> i
         return Result.ok();
     }
 
+    /**
+     * 删除收藏
+     * 
+     * @param shopId
+     * @return
+     */
     @Override
     public Result deleteFavorite(Long shopId) {
-        Long userId = UserHolder.getUser().getId();
-        if (userId == null) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
             return Result.fail("请先登录");
         }
         this.remove(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getShopId, shopId)
-                .eq(ShopFavorite::getUserId, userId));
+                .eq(ShopFavorite::getUserId, user.getId()));
         return Result.ok();
     }
 
+    /**
+     * 获取收藏列表
+     * 
+     * @return
+     */
     @Override
     public Result listFavorite() {
-        Long userId = UserHolder.getUser().getId();
-        if (userId == null) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
             return Result.fail("请先登录");
         }
         List<ShopFavorite> shopFavorites = this.list(new LambdaQueryWrapper<ShopFavorite>().eq(ShopFavorite::getUserId,
-                userId));
+                user.getId()));
 
         if (shopFavorites.isEmpty()) {
             return Result.ok(Collections.emptyList());

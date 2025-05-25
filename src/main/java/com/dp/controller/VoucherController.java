@@ -1,7 +1,5 @@
 package com.dp.controller;
 
-import javax.annotation.Resource;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,8 +22,11 @@ import com.dp.service.IVoucherService;
 @RequestMapping("/voucher")
 public class VoucherController {
 
-    @Resource
-    private IVoucherService voucherService;
+    private final IVoucherService voucherService;
+
+    public VoucherController(IVoucherService voucherService) {
+        this.voucherService = voucherService;
+    }
 
     /**
      * 新增普通券

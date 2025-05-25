@@ -1,7 +1,5 @@
 package com.dp.controller;
 
-import javax.annotation.Resource;
-
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,8 +20,11 @@ import com.dp.service.IAddressService;
 @RequestMapping("/address")
 public class AddressController {
 
-    @Resource
-    private IAddressService addressService;
+    private final IAddressService addressService;
+
+    public AddressController(IAddressService addressService) {
+        this.addressService = addressService;
+    }
 
     /**
      * 获取用户地址列表

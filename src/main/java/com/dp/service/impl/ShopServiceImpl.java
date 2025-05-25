@@ -11,8 +11,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,11 +42,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private IShopTypeService shopTypeService;
+    private final IShopTypeService shopTypeService;
+
+    public ShopServiceImpl(StringRedisTemplate stringRedisTemplate, IShopTypeService shopTypeService) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.shopTypeService = shopTypeService;
+    }
 
     @Override
     public Result queryById(Long id) {

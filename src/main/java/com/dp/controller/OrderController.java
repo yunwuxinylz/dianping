@@ -1,11 +1,9 @@
 package com.dp.controller;
 
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,9 +25,18 @@ import com.dp.service.IOrderService;
 @RestController
 @RequestMapping("/order")
 public class OrderController {
-    @Autowired
-    private IOrderService orderService;
+    private final IOrderService orderService;
 
+    public OrderController(IOrderService orderService) {
+        this.orderService = orderService;
+    }
+
+    /**
+     * 创建订单
+     * 
+     * @param orderDTO
+     * @return
+     */
     @PostMapping("/create")
     public Result createOrder(@RequestBody OrderCreateDTO orderDTO) {
         // 创建订单
@@ -37,6 +44,13 @@ public class OrderController {
         return Result.ok(orderId);
     }
 
+    /**
+     * 支付订单
+     * 
+     * @param orderId
+     * @param payType
+     * @return
+     */
     @PutMapping("/pay/{orderId}")
     public Result payOrder(@PathVariable Long orderId, @RequestParam Integer payType) {
         // 支付订单
@@ -49,6 +63,13 @@ public class OrderController {
 
     /**
      * 获取订单列表，支持多种筛选条件
+     * 
+     * @param status
+     * @param statuses
+     * @param uncommented
+     * @param current
+     * @param pageSize
+     * @return
      */
     @GetMapping("/list")
     public Result getOrderList(
@@ -57,12 +78,12 @@ public class OrderController {
             @RequestParam(required = false) Boolean uncommented,
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer pageSize) {
-        
+
         // 构建查询条件
         OrderQueryDTO queryDTO = new OrderQueryDTO();
         queryDTO.setCurrent(current);
         queryDTO.setPageSize(pageSize);
-        
+
         // 处理多状态参数
         if (StringUtils.hasText(statuses)) {
             List<Integer> statusList = Arrays.stream(statuses.split(","))
@@ -73,13 +94,19 @@ public class OrderController {
             // 处理单一状态参数
             queryDTO.setStatus(status);
         }
-        
+
         // 处理未评价条件
         queryDTO.setUncommented(uncommented);
-        
+
         return orderService.getOrderList(queryDTO);
     }
 
+    /**
+     * 查询订单状态
+     * 
+     * @param orderId
+     * @return
+     */
     @GetMapping("/status/{orderId}")
     public Result queryOrderStatus(@PathVariable Long orderId) {
         // 查询订单
@@ -92,6 +119,7 @@ public class OrderController {
 
     /**
      * 取消订单
+     * 
      * @param orderId
      * @param cancelReason
      * @return
@@ -105,6 +133,7 @@ public class OrderController {
 
     /**
      * 发货
+     * 
      * @param orderId
      * @return
      */
@@ -115,6 +144,7 @@ public class OrderController {
 
     /**
      * 确认收货
+     * 
      * @param orderId
      * @return
      */
@@ -125,6 +155,7 @@ public class OrderController {
 
     /**
      * 统计图形
+     * 
      * @return
      */
     @GetMapping("/statistics")

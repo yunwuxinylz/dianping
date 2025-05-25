@@ -1,5 +1,8 @@
 package com.dp.service;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
@@ -18,7 +21,7 @@ public interface IUserService extends IService<User> {
 
     Result sendCode(String phone, String type);
 
-    Result login(LoginFormDTO loginForm);
+    Result login(LoginFormDTO loginForm, HttpServletResponse response, HttpServletRequest request);
 
     Result register(RegisterFormDTO registerForm);
 
@@ -30,5 +33,5 @@ public interface IUserService extends IService<User> {
 
     Result resetPassword(String phone, String code, String password);
 
-    Result getCount();
+    Result refreshToken(HttpServletRequest request, HttpServletResponse response);
 }
