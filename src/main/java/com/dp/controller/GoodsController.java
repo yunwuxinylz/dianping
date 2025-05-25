@@ -81,6 +81,7 @@ public class GoodsController {
 
         return goodsService.goodsRecommendList(count);
     }
+
     
     /**
      * 获取商品总数
@@ -90,6 +91,8 @@ public class GoodsController {
     public Result getGoodsCount() {
         return goodsService.getGoodsCount();
     }
+
+
 
     /**
      * 更新库存
