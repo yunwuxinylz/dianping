@@ -64,6 +64,6 @@ public class User implements Serializable {
     /**
      * 管理员
      */
-    private Boolean isAdmin;
+    private String isAdmin;
 
 }

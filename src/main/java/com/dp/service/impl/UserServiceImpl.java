@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.List;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -17,6 +19,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.dto.LoginFormDTO;
@@ -39,6 +42,9 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
 /**
  * <p>
  * 服务实现类
@@ -57,12 +63,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     private final RedissonClient redissonClient;
 
+    private final UserMapper userMapper;
+
     public UserServiceImpl(StringRedisTemplate stringRedisTemplate, IUserInfoService userInfoService,
-            JwtUtils jwtUtils, RedissonClient redissonClient) {
+            JwtUtils jwtUtils, RedissonClient redissonClient,UserMapper userMapper) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.userInfoService = userInfoService;
         this.jwtUtils = jwtUtils;
         this.redissonClient = redissonClient;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -122,7 +131,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         // 生成双token
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        Boolean isAdmin = user.getIsAdmin();
         String accessToken = jwtUtils.generateAccessToken(userDTO);
         String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
 
@@ -196,7 +204,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         Map<String, Object> result = new HashMap<>();
         result.put("accessToken", accessToken);
-        result.put("isAdmin", isAdmin);
+        result.put("isAdmin", user.getIsAdmin());
         return Result.ok(result);
     }
 
@@ -385,6 +393,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
+    public Result createUser(User user) {
+        // 1.校验手机号
+        String phone = user.getPhone();
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            return Result.fail("手机号格式错误");
+        }
+        
+        // 2.判断手机号是否已存在
+        Long count = query().eq("phone", phone).count();
+        if (count > 0) {
+            return Result.fail("该手机号已注册");
+        }
+
+        // 3.密码加密
+        user.setPassword(PasswordEncoder.encode(user.getPassword()));
+        
+        // 4.设置默认昵称
+        if (StrUtil.isBlank(user.getNickName())) {
+            user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
+        }
+        
+        // 5.设置创建时间和更新时间
+        LocalDateTime now = LocalDateTime.now();
+        user.setCreateTime(now);
+        user.setUpdateTime(now);
+        
+        // 6.设置管理员标识
+        String adminValue = user.getIsAdmin() != null ? user.getIsAdmin().toString() : "0";
+        user.setIsAdmin(adminValue);
+        // 7.保存用户
+        save(user);
+        
+        return Result.ok();
+    }
+
+    @Override
     public Result getInfoDTO() {
         // 获取当前登录的用户id
         UserDTO userDTO = UserHolder.getUser();
@@ -399,4 +443,108 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         infoDTO.setIcon(userDTO.getIcon());
         return Result.ok(infoDTO);
     }
+
+    @Override
+    public Result getCount() {
+        try {
+            // 从数据库获取用户总数
+            long count = count();
+            return Result.ok(count);
+        } catch (Exception e) {
+            return Result.fail("获取用户总数失败");
+        }
+    }
+    
+    @Override
+    public Result getUserList(int page, int size, String query) {
+        // 创建分页对象
+        Page<User> pageInfo = new Page<>(page, size);
+        
+        // 构建查询条件
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        if (StrUtil.isNotBlank(query)) {
+            queryWrapper.like(User::getNickName, query)
+                    .or()
+                    .like(User::getPhone, query);
+        }
+        
+        // 执行查询
+        page(pageInfo, queryWrapper);
+        
+        // 转换结果中的isAdmin为角色文本
+        List<Map<String, Object>> records = pageInfo.getRecords().stream().map(user -> {
+            Map<String, Object> userMap = new HashMap<>();
+            userMap.put("id", user.getId());
+            userMap.put("phone", user.getPhone());
+            userMap.put("nickName", user.getNickName());
+            userMap.put("icon", user.getIcon());
+            userMap.put("createTime", user.getCreateTime());
+            // 根据isAdmin字段显示用户角色
+            userMap.put("isAdmin", user.getIsAdmin());
+            return userMap;
+        }).collect(Collectors.toList());
+        
+        // 创建新的分页对象返回转换后的结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("records", records);
+        result.put("total", pageInfo.getTotal());
+        result.put("size", pageInfo.getSize());
+        result.put("current", pageInfo.getCurrent());
+        
+        return Result.ok(result);
+    }
+    
+    @Override
+    public Result deleteUser(Long id) {
+        // 判断用户是否存在
+        User user = getById(id);
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+        // 删除用户
+        boolean success = removeById(id);
+        return success ? Result.ok() : Result.fail("删除失败");
+    }
+
+    @Override
+public Result adminUpdateUser(User user) {
+    // 1. 检查要更新的用户是否存在
+    User existUser = getById(user.getId());
+    if (existUser == null) {
+        return Result.fail("用户不存在");
+    }
+
+    // 2. 获取当前登录用户
+    UserDTO currentUser = UserHolder.getUser();
+    if (currentUser == null || !Boolean.TRUE.equals(currentUser.getIsAdmin())) {
+        return Result.fail("无权限操作");
+    }
+
+    // 3. 更新允许修改的字段
+    User updateUser = new User();
+    updateUser.setId(user.getId());
+    updateUser.setNickName(user.getNickName());
+    updateUser.setPhone(user.getPhone());
+    updateUser.setIsAdmin(user.getIsAdmin());
+
+    // 4. 更新用户信息
+    boolean success = updateById(updateUser);
+    return success ? Result.ok("更新成功") : Result.fail("更新失败");
+}
+
+@Override
+public Result listUsers(Integer page, Integer size, String query) {
+    Page<User> pageObj = new Page<>(page, size);
+    LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+    if (StringUtils.hasText(query)) {
+        wrapper.and(w -> w.like(User::getNickName, query)
+                          .or().like(User::getPhone, query));
+    }
+    wrapper.orderByDesc(User::getCreateTime);
+    Page<User> result = userMapper.selectPage(pageObj, wrapper);
+    Map<String, Object> data = new HashMap<>();
+    data.put("records", result.getRecords());
+    data.put("total", result.getTotal());
+    return Result.ok(data);
+}
 }

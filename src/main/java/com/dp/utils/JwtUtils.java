@@ -35,6 +35,7 @@ public class JwtUtils {
         claims.put("id", userDTO.getId());
         claims.put("nickName", userDTO.getNickName());
         claims.put("icon", userDTO.getIcon());
+        claims.put("isAdmin", userDTO.getIsAdmin());
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -67,6 +68,7 @@ public class JwtUtils {
         userDTO.setId(Long.valueOf(claims.getSubject()));
         userDTO.setNickName((String) claims.get("nickName"));
         userDTO.setIcon((String) claims.get("icon"));
+        userDTO.setIsAdmin((Boolean) claims.get("isAdmin"));
         return userDTO;
     }
 

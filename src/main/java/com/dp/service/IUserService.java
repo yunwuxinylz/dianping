@@ -34,4 +34,16 @@ public interface IUserService extends IService<User> {
     Result resetPassword(String phone, String code, String password);
 
     Result refreshToken(HttpServletRequest request, HttpServletResponse response);
+
+    Result getCount();
+    
+    Result getUserList(int page, int size, String query);
+    
+    Result deleteUser(Long id);
+
+    Result adminUpdateUser(User user);
+
+    Result createUser(User user);
+
+    Result listUsers(Integer page, Integer size, String query);
 }
