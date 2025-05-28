@@ -1,11 +1,135 @@
-@host = http://localhost:8080
+@host = http://localhost:8081
 
-@token = a45ac19e69354fb88bb65eeb6aa4d2ab
+@token = eyJhbGciOiJIUzI1NiJ9.eyJuaWNrTmFtZSI6InlseiIsImljb24iOiJodHRwczovL3l3eHlsei5vc3MtY24tZnV6aG91LmFsaXl1bmNzLmNvbS9pbWdzL2ljb24vMjAyNS8wNS8yMC84MDU5YTEzN2YxYjc0NjU3LnBuZyIsImlkIjoxMDE4LCJzdWIiOiIxMDE4IiwiaWF0IjoxNzQ4MzI5NzE1LCJleHAiOjE3NDgzMzAzMTV9.gOaw_QEm5TdNNLiFzLErKASJtbhCztHVJr6KffDUOI4
 
 
 
-POST {{host}}/api/voucher-order/seckill/11
+POST {{host}}/user/login
+Content-Type: application/json
+
+{
+    "phone": "18338319215",
+    "password": "123456"
+}
+
+
+#### 测试接口
+GET {{host}}/cart
 Authorization: {{token}}
+
+### 添加购物车
+POST {{host}}/cart/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+    "goodsId": 1,
+    "count": 1,
+    "skuId": 101,
+    "checked": true,
+    "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+    "price": 6800,
+    "skuName": "单人餐",
+    "goodsName": "东坡肉套餐"
+
+}
+
+{
+    "goodsId": 1,
+    "count": 1,
+    "skuId": 102,
+    "checked": true,
+    "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+    "price": 12800,
+    "skuName": "双人餐",
+    "goodsName": "东坡肉套餐"
+
+}
+
+{
+    "goodsId": 2,
+    "count": 1,
+    "skuId": 104,
+    "checked": true,
+    "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+    "price": 9800,
+    "skuName": "标准份",
+    "goodsName": "龙井虾仁"
+}
+
+{
+    "goodsId": 202,
+    "count": 1,
+    "skuId": 20201,
+    "checked": true,
+    "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+    "price": 188800,
+    "skuName": "基础设备",
+    "goodsName": "会议全日套餐"
+}
+### 购物车列表
+{
+  "success": true,
+  "data": [
+    {
+      "shopId": 1,
+      "shopName": "品味轩餐厅",
+      "items": [
+        {
+          "goodsId": 1,
+          "skuId": 102,
+          "goodsName": "东坡肉套餐",
+          "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+          "price": 12800,
+          "count": 3,
+          "checked": true,
+          "skuName": "双人餐"
+        },
+        {
+          "goodsId": 1,
+          "skuId": 101,
+          "goodsName": "东坡肉套餐",
+          "goodsImages": "https://images.pexels.com/photos/718742/pexels-photo-718742.jpeg",
+          "price": 6800,
+          "count": 2,
+          "checked": true,
+          "skuName": "单人餐"
+        },
+        {
+          "goodsId": 2,
+          "skuId": 104,
+          "goodsName": "龙井虾仁",
+          "goodsImages": "https://images.unsplash.com/photo-1567337710282-00832b415979",
+          "price": 9800,
+          "count": 1,
+          "checked": true,
+          "skuName": "标准份"
+        }
+      ]
+    },
+    {
+      "shopId": 2,
+      "shopName": "舒适酒店",
+      "items": [
+        {
+          "goodsId": 201,
+          "skuId": 20101,
+          "goodsName": "豪华大床房",
+          "goodsImages": "https://images.unsplash.com/photo-1564501049412-61c2a3083791",
+          "price": 39900,
+          "count": 2,
+          "checked": true,
+          "skuName": "无早"
+        }
+      ]
+    }
+  ]
+}
+
+
+
+
+
 
 #### 秒杀下单
 POST {{host}}/api/voucher/seckill
@@ -23,3 +147,5 @@ Content-Type: application/json
     "beginTime": "2025-03-20T10:00:00",
     "endTime": "2025-04-20T10:00:00"
 }
+
+

@@ -26,6 +26,13 @@ import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+
 /**
  * <p>
  * 前端控制器
@@ -36,6 +43,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 @Slf4j
 @RestController
 @RequestMapping("/user")
+@Tag(name = "用户管理", description = "用户相关的API接口")
 public class UserController {
 
     private final IUserService userService;
@@ -52,7 +60,10 @@ public class UserController {
      * 发送手机验证码
      */
     @PostMapping("code")
-    public Result sendCode(@RequestBody Map<String, String> data) {
+    @Operation(summary = "发送手机验证码", description = "发送手机验证码用于登录或注册")
+    @ApiResponse(responseCode = "200", description = "发送成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result sendCode(
+            @Parameter(description = "包含手机号和验证码类型的数据") @RequestBody Map<String, String> data) {
         // 1.获取手机号
         String phone = data.get("phone");
         if (StrUtil.isBlank(phone)) {
@@ -70,10 +81,13 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO loginForm, HttpServletResponse response,
+    @Operation(summary = "用户登录", description = "用户登录功能，支持验证码或密码登录")
+    @ApiResponse(responseCode = "200", description = "登录成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result login(
+            @Parameter(description = "登录表单，包含手机号和验证码或密码") @RequestBody LoginFormDTO loginForm,
+            HttpServletResponse response,
             HttpServletRequest request) {
         // 实现登录功能
-
         return userService.login(loginForm, response, request);
     }
 
@@ -85,6 +99,8 @@ public class UserController {
      * @return
      */
     @GetMapping("/refresh-token")
+    @Operation(summary = "刷新令牌", description = "刷新用户访问令牌")
+    @ApiResponse(responseCode = "200", description = "刷新成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result refreshToken(HttpServletRequest request, HttpServletResponse response) {
         // 实现刷新accessToken功能
         return userService.refreshToken(request, response);
@@ -96,7 +112,10 @@ public class UserController {
      * @param registerForm 注册参数，包含手机号、验证码、密码
      */
     @PostMapping("/register")
-    public Result register(@RequestBody RegisterFormDTO registerForm) {
+    @Operation(summary = "用户注册", description = "用户注册功能")
+    @ApiResponse(responseCode = "200", description = "注册成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result register(
+            @Parameter(description = "注册表单，包含手机号、验证码和密码") @RequestBody RegisterFormDTO registerForm) {
         // 实现注册功能
         return userService.register(registerForm);
     }
@@ -109,7 +128,10 @@ public class UserController {
      * @return
      */
     @PutMapping("/reset-password")
-    public Result resetPassword(@RequestBody Map<String, String> data) {
+    @Operation(summary = "重置密码", description = "忘记密码功能，通过验证码重置密码")
+    @ApiResponse(responseCode = "200", description = "重置成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result resetPassword(
+            @Parameter(description = "包含手机号、验证码和新密码的数据") @RequestBody Map<String, String> data) {
         // 实现忘记密码功能
         String phone = data.get("phone");
         String code = data.get("code");
@@ -123,6 +145,8 @@ public class UserController {
      * @return 无
      */
     @PostMapping("/logout")
+    @Operation(summary = "用户登出", description = "用户退出登录")
+    @ApiResponse(responseCode = "200", description = "登出成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result logout(HttpServletRequest request, HttpServletResponse response) {
         // 获取当前登录的用户信息
         Long userId = UserHolder.getUser().getId();
@@ -153,26 +177,34 @@ public class UserController {
     }
 
     @GetMapping("/info")
+    @Operation(summary = "获取用户信息", description = "获取当前登录用户的详细信息")
+    @ApiResponse(responseCode = "200", description = "获取成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result info() {
         // 获取当前登录的用户信息
         return userService.getInfoDTO();
     }
 
     @PutMapping("/info")
-    public Result update(@RequestBody UserInfo userInfo) {
+    @Operation(summary = "更新用户详细信息", description = "更新用户的详细个人信息")
+    @ApiResponse(responseCode = "200", description = "更新成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result update(
+            @Parameter(description = "用户详细信息") @RequestBody UserInfo userInfo) {
         // 更新用户信息
         return userService.update(userInfo);
     }
 
     // 头像和昵称在user表里，修改头像和昵称
     @PutMapping("/update")
-    public Result update(@RequestBody User user) {
+    @Operation(summary = "更新用户基本信息", description = "更新用户的基本信息，如头像和昵称")
+    @ApiResponse(responseCode = "200", description = "更新成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result update(
+            @Parameter(description = "用户基本信息") @RequestBody User user) {
         // 更新用户信息
         return userService.updateUser(user);
     }
 
     // @GetMapping("/count")
     // public Result getCount() {
-    //     return userService.getCount();
+    // return userService.getCount();
     // }
 }

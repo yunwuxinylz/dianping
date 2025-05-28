@@ -36,7 +36,13 @@ public class MvcConfig implements WebMvcConfigurer {
                                                 "/user/register",
                                                 "/user/reset-password",
                                                 "/user/refresh-token",
-                                                "/goods/**")
+                                                "/goods/**",
+                                                "/swagger-ui.html",
+                                                "/swagger-ui/**",
+                                                "/api-docs/**",
+                                                "/v3/api-docs/**",
+                                                "/swagger-resources/**",
+                                                "/webjars/**")
                                 .order(1);
                 // token刷新的拦截器
                 registry.addInterceptor(new RefreshTokenInterceptor(jwtUtils)).addPathPatterns("/**")

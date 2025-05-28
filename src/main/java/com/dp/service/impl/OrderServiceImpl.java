@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
-import javax.annotation.Resource;
 
+import javax.annotation.Resource;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,6 +38,7 @@ import com.dp.dto.UserDTO;
 import com.dp.entity.Order;
 import com.dp.entity.OrderItems;
 import com.dp.mapper.OrderMapper;
+import com.dp.service.IGoodSKUService;
 import com.dp.service.IGoodsService;
 import com.dp.service.IOrderItemsService;
 import com.dp.service.IOrderService;
@@ -55,21 +56,21 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
     private final IGoodsService goodsService;
     private final IOrderItemsService orderItemsService;
+    private final IGoodSKUService goodSKUService;
     private final RabbitTemplate rabbitTemplate;
     private final StringRedisTemplate stringRedisTemplate;
 
     public OrderServiceImpl(IGoodsService goodsService, IOrderItemsService orderItemsService,
-            RabbitTemplate rabbitTemplate, StringRedisTemplate stringRedisTemplate) {
+            RabbitTemplate rabbitTemplate, StringRedisTemplate stringRedisTemplate, IGoodSKUService goodSKUService) {
         this.goodsService = goodsService;
         this.orderItemsService = orderItemsService;
         this.rabbitTemplate = rabbitTemplate;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.goodSKUService = goodSKUService;
     }
-
 
     @Resource
     private OrderMapper orderMapper;
-
 
     @Override
     @Transactional
@@ -116,7 +117,29 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 保存订单列表项
         orderItemsService.saveBatch(orderItemsList);
 
-        // 库存已统一扣减
+        // 库存扣减
+        for (OrderItems orderItem : orderItemsList) {
+            // 如果有SKU，则扣减SKU库存
+            if (orderItem.getSkuId() != null) {
+                boolean success = goodSKUService.update()
+                        .setSql("stock = stock - " + orderItem.getCount())
+                        .eq("id", orderItem.getSkuId())
+                        .ge("stock", orderItem.getCount()) // 确保库存充足
+                        .update();
+                if (!success) {
+                    throw new RuntimeException("库存不足，无法下单");
+                }
+                // 扣减商品库存
+                boolean success1 = goodsService.update()
+                        .setSql("stock = stock - " + orderItem.getCount())
+                        .eq("id", orderItem.getGoodsId())
+                        .ge("stock", orderItem.getCount()) // 确保库存充足
+                        .update();
+                if (!success1) {
+                    throw new RuntimeException("库存不足，无法下单");
+                }
+            }
+        }
 
         stringRedisTemplate.opsForValue().set(RedisConstants.ORDER_STATUS + order.getId(),
                 order.getStatus().toString());
@@ -165,6 +188,27 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .update();
 
         if (success) {
+            // 增加销量
+            List<OrderItems> orderItems = orderItemsService.query()
+                    .eq("order_id", orderId)
+                    .list();
+
+            for (OrderItems orderItem : orderItems) {
+                // 如果有SKU，则增加SKU销量
+                if (orderItem.getSkuId() != null) {
+                    goodSKUService.update()
+                            .setSql("sold = sold + " + orderItem.getCount())
+                            .eq("id", orderItem.getSkuId())
+                            .update();
+                }
+
+                // 增加商品销量
+                goodsService.update()
+                        .setSql("sold = sold + " + orderItem.getCount())
+                        .eq("id", orderItem.getGoodsId())
+                        .update();
+            }
+
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
         }
         return success;
@@ -308,13 +352,20 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
             // 恢复库存
             for (OrderItems orderItem : orderItems) {
-                Result result = goodsService.updateStock(orderItem.getGoodsId(), -orderItem.getCount(),
-                        orderItem.getSkuId());
-                if (!result.getSuccess()) {
-                    return Result.fail("订单取消失败");
+                // 如果有SKU，则恢复SKU库存
+                if (orderItem.getSkuId() != null) {
+                    goodSKUService.update()
+                            .setSql("stock = stock + " + orderItem.getCount())
+                            .eq("id", orderItem.getSkuId())
+                            .update();
+                    // 恢复商品库存
+                    goodsService.update()
+                            .setSql("stock = stock + " + orderItem.getCount())
+                            .eq("id", orderItem.getGoodsId())
+                            .update();
                 }
             }
-            // 如果redis中存在订单状态，则删除
+
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
         }
         return Result.ok();
@@ -351,14 +402,22 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     .filter(item -> item.getOrderId().equals(orderId))
                     .collect(Collectors.toList()); // 替换 toList() 为 collect(Collectors.toList())
 
+            // 恢复库存
             for (OrderItems orderItem : orderItems) {
-                Result result = goodsService.updateStock(orderItem.getGoodsId(), -orderItem.getCount(),
-                        orderItem.getSkuId());
-                if (!result.getSuccess()) {
-                    log.info("订单{}恢复库存失败，取消失败", orderId);
-                    return Result.fail("订单取消失败");
+                // 如果有SKU，则恢复SKU库存
+                if (orderItem.getSkuId() != null) {
+                    goodSKUService.update()
+                            .setSql("stock = stock + " + orderItem.getCount())
+                            .eq("id", orderItem.getSkuId())
+                            .update();
+                    // 恢复商品库存
+                    goodsService.update()
+                            .setSql("stock = stock + " + orderItem.getCount())
+                            .eq("id", orderItem.getGoodsId())
+                            .update();
                 }
             }
+
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
             log.info("订单{}超时已取消", orderId);
         }
@@ -531,25 +590,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             // 获取今天的开始时间和结束时间
             LocalDateTime today = LocalDate.now().atStartOfDay();
             LocalDateTime tomorrow = today.plusDays(1);
-            
+
             // 查询今日已支付订单的销售额总和
             // 只统计状态为已支付(2)、待收货(4)和已完成(5)的订单
             Long todaySales = lambdaQuery()
-                .ge(Order::getCreateTime, today)
-                .lt(Order::getCreateTime, tomorrow)
-                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
-                .list()
-                .stream()
-                .mapToLong(Order::getAmount)
-                .sum();
-            
+                    .ge(Order::getCreateTime, today)
+                    .lt(Order::getCreateTime, tomorrow)
+                    .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                    .list()
+                    .stream()
+                    .mapToLong(Order::getAmount)
+                    .sum();
+
             return Result.ok(todaySales);
         } catch (Exception e) {
             log.error("获取今日销售额失败", e);
             return Result.fail("获取今日销售额失败");
         }
     }
-    
+
     @Override
     public Result getWeekSales() {
         try {
@@ -558,24 +617,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             LocalDate sevenDaysAgo = today.minusDays(6); // 包括今天在内的7天
             LocalDateTime startTime = sevenDaysAgo.atStartOfDay();
             LocalDateTime endTime = today.plusDays(1).atStartOfDay(); // 今天结束时间
-            
+
             // 查询最近7天的订单
             List<Order> orders = lambdaQuery()
-                .ge(Order::getCreateTime, startTime)
-                .lt(Order::getCreateTime, endTime)
-                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
-                .list();
-            
+                    .ge(Order::getCreateTime, startTime)
+                    .lt(Order::getCreateTime, endTime)
+                    .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                    .list();
+
             // 按日期分组计算每天的销售额
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Map<String, Long> dailySales = new TreeMap<>(); // 使用TreeMap保持日期顺序
-            
+
             // 初始化最近7天的每一天
             for (int i = 6; i >= 0; i--) {
                 String dayStr = today.minusDays(i).format(formatter);
                 dailySales.put(dayStr, 0L);
             }
-            
+
             // 填充每日销售数据
             orders.forEach(order -> {
                 String dayStr = order.getCreateTime().toLocalDate().format(formatter);
@@ -583,17 +642,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     dailySales.compute(dayStr, (k, v) -> v + order.getAmount());
                 }
             });
-            
+
             // 转换为前端需要的数据格式
             List<Map<String, Object>> result = dailySales.entrySet().stream()
-                .map(entry -> {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("date", entry.getKey());
-                    item.put("sales", entry.getValue());
-                    return item;
-                })
-                .collect(Collectors.toList());
-            
+                    .map(entry -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("date", entry.getKey());
+                        item.put("sales", entry.getValue());
+                        return item;
+                    })
+                    .collect(Collectors.toList());
+
             return Result.ok(result);
         } catch (Exception e) {
             log.error("获取最近7天销售趋势失败", e);
