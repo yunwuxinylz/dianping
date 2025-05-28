@@ -31,6 +31,7 @@ import com.dp.service.IShopService;
 import com.dp.utils.StockUtils;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,9 +69,19 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     private static final String CART_KEY_PREFIX = "cart:user:";
 
     /**
+     * Redis幂等性KEY前缀
+     */
+    private static final String IDEMPOTENT_KEY_PREFIX = "cart:idempotent:";
+
+    /**
      * 购物车数据缓存时间(天)
      */
     private static final int CART_EXPIRE_DAYS = 7;
+
+    /**
+     * 幂等性标识过期时间(分钟)
+     */
+    private static final int IDEMPOTENT_EXPIRE_MINUTES = 10;
 
     /**
      * 获取用户购物车
@@ -215,6 +226,41 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     }
 
     /**
+     * 生成请求标识
+     * 
+     * @param userId 用户ID
+     * @param action 操作类型
+     * @param params 参数数组
+     * @return 请求标识
+     */
+    private String generateRequestId(Long userId, String action, Object... params) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(userId).append(":").append(action);
+        for (Object param : params) {
+            if (param != null) {
+                sb.append(":").append(param);
+            } else {
+                sb.append(":null");
+            }
+        }
+        // 使用MD5生成固定长度的标识
+        return DigestUtil.md5Hex(sb.toString());
+    }
+
+    /**
+     * 检查是否是重复请求
+     * 
+     * @param requestId 请求标识
+     * @return 是否是重复请求
+     */
+    private boolean isRepeatedRequest(String requestId) {
+        String key = IDEMPOTENT_KEY_PREFIX + requestId;
+        Boolean absent = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", IDEMPOTENT_EXPIRE_MINUTES,
+                TimeUnit.MINUTES);
+        return absent == null || !absent;
+    }
+
+    /**
      * 添加商品到购物车
      */
     @Override
@@ -224,6 +270,15 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             // 参数校验
             if (userId == null || cartItem == null || cartItem.getGoodsId() == null || cartItem.getCount() == null) {
                 return Result.fail("参数错误");
+            }
+
+            // 生成请求标识并检查幂等性 - 移除UUID参数，使用固定输入参数保证幂等
+            String requestId = generateRequestId(userId, "addToCart", cartItem.getGoodsId(),
+                    cartItem.getSkuId(), cartItem.getCount(), cartItem.getChecked());
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的添加购物车请求：用户ID={}，商品ID={}，SKU ID={}",
+                        userId, cartItem.getGoodsId(), cartItem.getSkuId());
+                return Result.ok("重复的添加购物车请求");
             }
 
             // 查询商品信息
@@ -348,7 +403,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             // 发送消息到MQ，异步更新数据库
             sendCartUpdateMessage(userId);
 
-            return Result.ok();
+            return Result.ok("添加购物车成功");
         } catch (Exception e) {
             log.error("添加购物车失败", e);
             return Result.fail("添加购物车失败");
@@ -362,6 +417,14 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             // 参数校验
             if (userId == null || goodsId == null || count == null || count < 1) {
                 return Result.fail("参数错误");
+            }
+
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "updateCartItemCount", goodsId, skuId, count);
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的更新购物车数量请求：用户ID={}，商品ID={}，SKU ID={}，数量={}",
+                        userId, goodsId, skuId, count);
+                return Result.ok("重复的更新购物车数量请求");
             }
 
             // 检查库存
@@ -436,6 +499,13 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result removeFromCart(Long userId, Long goodsId, Long skuId) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "removeFromCart", goodsId, skuId);
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的移除购物车商品请求：用户ID={}，商品ID={}，SKU ID={}", userId, goodsId, skuId);
+                return Result.ok("重复的移除购物车商品请求");
+            }
+
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
             String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
@@ -475,7 +545,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             // 发送消息到MQ，异步更新数据库
             sendCartUpdateMessage(userId);
 
-            return Result.ok();
+            return Result.ok("移除购物车商品成功");
         } catch (Exception e) {
             log.error("移除购物车商品失败", e);
             return Result.fail("移除购物车商品失败");
@@ -489,6 +559,13 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result clearCart(Long userId) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "clearCart");
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的清空购物车请求：用户ID={}", userId);
+                return Result.ok("重复的清空购物车请求");
+            }
+
             List<ShopCartDTO> cartList = new ArrayList<>();
 
             // 更新Redis缓存
@@ -511,6 +588,14 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result checkCartItem(Long userId, Long goodsId, Long skuId, Boolean checked) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "checkCartItem", goodsId, skuId, checked);
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的选中/取消选中购物车商品请求：用户ID={}，商品ID={}，SKU ID={}，状态={}",
+                        userId, goodsId, skuId, checked);
+                return Result.ok("重复的选中/取消选中购物车商品请求");
+            }
+
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
             String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
@@ -559,6 +644,13 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result checkAllItems(Long userId, Boolean checked) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "checkAllItems", checked);
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的全选/取消全选请求：用户ID={}，状态={}", userId, checked);
+                return Result.ok("重复的全选/取消全选请求");
+            }
+
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
             String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
@@ -594,6 +686,14 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result checkShopItems(Long userId, Long shopId, Boolean checked) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "checkShopItems", shopId, checked);
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的选中/取消选中商铺商品请求：用户ID={}，商铺ID={}，状态={}",
+                        userId, shopId, checked);
+                return Result.ok("重复的选中/取消选中商铺商品请求");
+            }
+
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
             String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
@@ -633,6 +733,13 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Transactional
     public Result removeCheckedItems(Long userId) {
         try {
+            // 生成请求标识并检查幂等性
+            String requestId = generateRequestId(userId, "removeCheckedItems");
+            if (isRepeatedRequest(requestId)) {
+                log.info("重复的移除选中商品请求：用户ID={}", userId);
+                return Result.ok("重复的移除选中商品请求");
+            }
+
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
             String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
@@ -654,7 +761,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             // 发送消息到MQ，异步更新数据库
             sendCartUpdateMessage(userId);
 
-            return Result.ok();
+            return Result.ok("移除选中的商品成功");
         } catch (Exception e) {
             log.error("移除选中的商品失败", e);
             return Result.fail("移除选中的商品失败");
@@ -666,14 +773,25 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
      */
     private void updateCartCache(Long userId, List<ShopCartDTO> cartList) {
         String cartKey = CART_KEY_PREFIX + userId;
-        stringRedisTemplate.opsForValue().set(cartKey, JSONUtil.toJsonStr(cartList), CART_EXPIRE_DAYS, TimeUnit.DAYS);
+        if (cartList == null || cartList.isEmpty()) {
+            // 如果购物车为空，设置空数组
+            stringRedisTemplate.opsForValue().set(cartKey, "[]", CART_EXPIRE_DAYS, TimeUnit.DAYS);
+        } else {
+            stringRedisTemplate.opsForValue().set(cartKey, JSONUtil.toJsonStr(cartList), CART_EXPIRE_DAYS,
+                    TimeUnit.DAYS);
+        }
     }
 
     /**
      * 发送购物车更新消息到MQ
      */
     private void sendCartUpdateMessage(Long userId) {
-        rabbitTemplate.convertAndSend("cart.exchange", "cart.save", userId);
+        try {
+            rabbitTemplate.convertAndSend("cart.exchange", "cart.save", userId);
+            log.info("发送购物车更新消息成功，用户ID：{}", userId);
+        } catch (Exception e) {
+            log.error("发送购物车更新消息失败，用户ID：{}", userId, e);
+        }
     }
 
 }

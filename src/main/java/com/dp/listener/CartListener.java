@@ -13,19 +13,19 @@ import javax.annotation.Resource;
 
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.dp.dto.CartDTO;
 import com.dp.dto.CartItemDTO;
 import com.dp.dto.ShopCartDTO;
 import com.dp.entity.Cart;
 import com.dp.service.ICartService;
 import com.rabbitmq.client.Channel;
 
+import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CartListener {
 
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private ICartService cartService;
@@ -74,12 +74,22 @@ public class CartListener {
     private void syncCartToDatabase(Long userId) {
         // 获取Redis中的购物车数据
         String cartKey = CART_KEY_PREFIX + userId;
-        CartDTO cartDTO = (CartDTO) redisTemplate.opsForValue().get(cartKey);
+        String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
 
-        // 如果Redis中没有数据，直接返回
-        if (cartDTO == null || cartDTO.getShopCarts() == null || cartDTO.getShopCarts().isEmpty()) {
+        if (cartJson == null) {
+            log.info("用户[{}]的Redis购物车数据不存在", userId);
             return;
         }
+
+        // 如果Redis中是[]，清空MySQL中的购物车数据
+        if ("[]".equals(cartJson)) {
+            log.info("用户[{}]的Redis购物车为空，清空数据库购物车", userId);
+            cartService.remove(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
+            return;
+        }
+
+        // 解析Redis中的购物车数据
+        List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
         // 获取数据库中现有的购物车数据
         List<Cart> existingCarts = cartService.list(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
@@ -100,8 +110,7 @@ public class CartListener {
         Set<String> redisCartKeys = new HashSet<>();
 
         // 处理Redis中的购物车数据
-        for (Map.Entry<Long, ShopCartDTO> entry : cartDTO.getShopCarts().entrySet()) {
-            ShopCartDTO shopCart = entry.getValue();
+        for (ShopCartDTO shopCart : cartList) {
             if (CollectionUtils.isEmpty(shopCart.getItems())) {
                 continue;
             }
