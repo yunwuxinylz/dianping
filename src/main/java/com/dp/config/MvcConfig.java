@@ -36,6 +36,7 @@ public class MvcConfig implements WebMvcConfigurer {
                                                 "/user/register",
                                                 "/user/reset-password",
                                                 "/user/refresh-token",
+                                                "/user/captcha",
                                                 "/goods/**",
                                                 "/swagger-ui.html",
                                                 "/swagger-ui/**",
