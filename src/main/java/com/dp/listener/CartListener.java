@@ -51,6 +51,7 @@ public class CartListener {
      */
     private static final String CART_KEY_PREFIX = "cart:user:";
     private static final String CART_SYNC_LOCK_PREFIX = "cart:sync:";
+    private static final String SHOP_FIELD_PREFIX = "shop:";
 
     /**
      * 监听购物车保存消息，将Redis中的购物车数据同步到数据库
@@ -89,29 +90,36 @@ public class CartListener {
     }
 
     /**
-     * 同步Redis购物车数据到数据库
-     * 
-     * @param userId 用户ID
+     * 同步Redis购物车数据到数据库 (适配Hash结构)
      */
     private void syncCartToDatabase(Long userId) {
         // 获取Redis中的购物车数据
         String cartKey = CART_KEY_PREFIX + userId;
-        String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
+        Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
 
-        if (cartJson == null) {
+        if (entries.isEmpty()) {
             log.info("用户[{}]的Redis购物车数据不存在", userId);
-            return;
-        }
-
-        // 如果Redis中是[]，清空MySQL中的购物车数据
-        if ("[]".equals(cartJson)) {
-            log.info("用户[{}]的Redis购物车为空，清空数据库购物车", userId);
+            // 清空MySQL中的购物车数据
             cartService.remove(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
             return;
         }
 
-        // 解析Redis中的购物车数据
-        List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
+        // 转换Hash结构为购物车列表
+        List<ShopCartDTO> cartList = new ArrayList<>();
+        for (Map.Entry<Object, Object> entry : entries.entrySet()) {
+            String key = (String) entry.getKey();
+            if (key.startsWith(SHOP_FIELD_PREFIX)) {
+                ShopCartDTO shopCart = JSONUtil.toBean((String) entry.getValue(), ShopCartDTO.class);
+                cartList.add(shopCart);
+            }
+        }
+
+        // 如果购物车为空，清空数据库
+        if (cartList.isEmpty()) {
+            log.info("用户[{}]的Redis购物车为空，清空数据库购物车", userId);
+            cartService.remove(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
+            return;
+        }
 
         // 使用批处理提高性能
         processBatchCartSync(userId, cartList);

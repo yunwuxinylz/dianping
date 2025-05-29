@@ -34,7 +34,6 @@ import com.dp.service.IGoodsService;
 import com.dp.service.IShopService;
 import com.dp.utils.StockUtils;
 
-import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -98,6 +97,9 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
      */
     private static final long LOCK_LEASE_SECONDS = 3;
 
+    // 新增商铺字段前缀
+    private static final String SHOP_FIELD_PREFIX = "shop:";
+
     // 缓存商品信息的Map，避免频繁查询数据库
     private final Map<Long, Goods> goodsCache = new HashMap<>();
     private final Map<Long, GoodSKU> skuCache = new HashMap<>();
@@ -108,15 +110,17 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
      */
     @Override
     public Result getUserCart(Long userId) {
-        // 先从Redis获取购物车
+        // 从Redis获取购物车(使用Hash结构)
         String cartKey = CART_KEY_PREFIX + userId;
-        String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
+        Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
 
-        if (StrUtil.isBlank(cartJson)) {
+        if (entries.isEmpty()) {
+            // 如果Redis中没有数据，从数据库加载
             return Result.ok(loadCartFromDB(userId));
         }
 
-        List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
+        // 将Hash结构转换为购物车列表
+        List<ShopCartDTO> cartList = convertHashToCartList(entries);
         List<String> stockWarnings = new ArrayList<>();
         boolean hasStockWarning = checkCartItemStock(userId, cartList, stockWarnings);
 
@@ -127,6 +131,23 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         }
 
         return Result.ok(cartList);
+    }
+
+    /**
+     * 将Redis Hash结构转换为购物车列表
+     */
+    private List<ShopCartDTO> convertHashToCartList(Map<Object, Object> entries) {
+        List<ShopCartDTO> cartList = new ArrayList<>();
+
+        for (Map.Entry<Object, Object> entry : entries.entrySet()) {
+            String key = (String) entry.getKey();
+            if (key.startsWith(SHOP_FIELD_PREFIX)) {
+                ShopCartDTO shopCart = JSONUtil.toBean((String) entry.getValue(), ShopCartDTO.class);
+                cartList.add(shopCart);
+            }
+        }
+
+        return cartList;
     }
 
     // 提取检查库存的逻辑为单独方法
@@ -212,7 +233,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             shopCart.getItems().add(cartItemDTO);
         }
 
-        // 存入Redis
+        // 存入Redis (使用Hash结构)
         updateCartCache(userId, cartList);
 
         return cartList;
@@ -345,17 +366,28 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车并更新
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            List<ShopCartDTO> cartList = StrUtil.isBlank(cartJson) ? new ArrayList<>()
-                    : JSONUtil.toList(cartJson, ShopCartDTO.class);
+
+            // 获取购物车数据(使用Hash结构)
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
+            }
 
             // 处理添加商品逻辑
             boolean success = updateCartWithNewItem(cartList, goods, cartItem);
 
             if (!success) {
                 return Result.fail("库存不足");
-
             }
+
             // 更新Redis缓存
             updateCartCache(userId, cartList);
 
@@ -468,12 +500,18 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
-            }
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
 
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
+            }
 
             for (ShopCartDTO shopCart : cartList) {
                 for (CartItemDTO item : shopCart.getItems()) {
@@ -519,13 +557,20 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
                 return Result.fail("请求正在处理中，请稍后再试");
             }
 
-            // 从Redis获取购物车
+            // 从Redis获取购物车(使用Hash结构)
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
             }
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
             // 查找并移除购物车项
             boolean found = false;
@@ -619,11 +664,18 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
             }
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
             // 查找并更新购物车项
             boolean found = false;
@@ -679,11 +731,18 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
             }
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
             // 更新所有商品的选中状态
             for (ShopCartDTO shopCart : cartList) {
@@ -726,11 +785,18 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
             }
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
             // 更新指定商铺的所有商品选中状态
             ShopCartDTO shopCart = cartList.stream()
@@ -777,11 +843,18 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            String cartJson = stringRedisTemplate.opsForValue().get(cartKey);
-            if (StrUtil.isBlank(cartJson)) {
-                return Result.fail("购物车为空");
+            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+            List<ShopCartDTO> cartList;
+
+            if (entries.isEmpty()) {
+                // 从数据库加载购物车
+                cartList = loadCartFromDB(userId);
+                if (cartList.isEmpty()) {
+                    return Result.fail("购物车为空");
+                }
+            } else {
+                cartList = convertHashToCartList(entries);
             }
-            List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
             // 移除选中的商品
             for (ShopCartDTO shopCart : cartList) {
@@ -809,12 +882,31 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     }
 
     /**
-     * 更新Redis缓存中的购物车数据
+     * 更新Redis缓存中的购物车数据 (使用Hash结构)
      */
     private void updateCartCache(Long userId, List<ShopCartDTO> cartList) {
         String cartKey = CART_KEY_PREFIX + userId;
-        String cartJson = cartList == null || cartList.isEmpty() ? "[]" : JSONUtil.toJsonStr(cartList);
-        stringRedisTemplate.opsForValue().set(cartKey, cartJson, CART_EXPIRE_DAYS, TimeUnit.DAYS);
+
+        // 首先删除现有数据(包括旧格式的String类型数据)
+        stringRedisTemplate.delete(cartKey);
+
+        if (cartList != null && !cartList.isEmpty()) {
+            // 使用Hash结构保存每个商铺的购物车
+            Map<String, String> shopEntries = new HashMap<>();
+
+            for (ShopCartDTO shopCart : cartList) {
+                String shopField = SHOP_FIELD_PREFIX + shopCart.getShopId();
+                shopEntries.put(shopField, JSONUtil.toJsonStr(shopCart));
+            }
+
+            // 批量写入Hash
+            if (!shopEntries.isEmpty()) {
+                stringRedisTemplate.opsForHash().putAll(cartKey, shopEntries);
+            }
+        }
+
+        // 设置过期时间
+        stringRedisTemplate.expire(cartKey, CART_EXPIRE_DAYS, TimeUnit.DAYS);
     }
 
     /**

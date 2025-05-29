@@ -362,48 +362,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (!order.getUserId().equals(userId)) {
             throw new RuntimeException("订单不属于当前用户");
         }
-        // 修改订单状态
-        boolean success = update()
-                .set("status", 3) // 已取消
-                .set("cancel_reason", reason) // 取消原因
-                .eq("id", orderId)
-                .update();
 
-        if (success) {
-            List<OrderItems> orderItems = orderItemsService.list()
-                    .stream()
-                    .filter(item -> item.getOrderId().equals(orderId))
-                    .collect(Collectors.toList()); // 替换 toList() 为 collect(Collectors.toList())
-
-            // 恢复库存
-            for (OrderItems orderItem : orderItems) {
-                Long goodsId = orderItem.getGoodsId();
-                Long skuId = orderItem.getSkuId();
-                Integer count = orderItem.getCount();
-
-                // 如果有SKU，则恢复SKU库存
-                if (skuId != null) {
-                    // 恢复SKU库存
-                    goodSKUService.update()
-                            .setSql("stock = stock + " + count)
-                            .eq("id", skuId)
-                            .update();
-
-                    // 恢复商品库存
-                    goodsService.update()
-                            .setSql("stock = stock + " + count)
-                            .eq("id", goodsId)
-                            .update();
-                }
-
-                // 删除Redis缓存中的库存数据
-                stockUtils.deleteGoodsStockCache(goodsId);
-                stockUtils.deleteSkuStockCache(skuId);
-            }
-
-            stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
-        }
-        return Result.ok();
+        return cancel(orderId, reason);
     }
 
     /**
@@ -422,7 +382,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             return Result.fail("订单不存在或已支付");
         }
 
-        Order order = getById(orderId);
+        return cancel(orderId, reason);
+    }
+
+    private Result cancel(Long orderId, String reason) {
         // 修改订单状态
         boolean success = this.update()
                 .set("status", 3) // 已取消
@@ -463,8 +426,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 stockUtils.deleteSkuStockCache(skuId);
             }
 
-            stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
-            log.info("订单{}超时已取消", orderId);
+            stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + orderId);
         }
         return Result.ok(); // 添加返回值
     }
