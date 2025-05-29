@@ -20,6 +20,12 @@ public class ShopCartDTO implements Serializable {
     private String shopName;
 
     /**
+     * 商店图片
+     * 
+     */
+    private List<String> shopImage;
+
+    /**
      * 购物车商品列表
      */
     private List<CartItemDTO> items;

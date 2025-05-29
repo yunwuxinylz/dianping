@@ -85,7 +85,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setUserId(userId);
         order.setShopId(orderDTO.getShopId());
         order.setShopName(orderDTO.getShopName());
-        order.setShopImage(orderDTO.getShopImage());
+        if (orderDTO.getShopImage() != null) {
+            List<String> shopImages = orderDTO.getShopImage();
+            String shopImagesStr = String.join(",", shopImages);
+            order.setShopImage(shopImagesStr);
+        }
+
         order.setRemark(orderDTO.getRemark());
         order.setAmount(orderDTO.getAmount());
         order.setPayType(orderDTO.getPayType());
@@ -95,7 +100,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setAddressDetail(orderDTO.getAddressDetail());
         order.setAddressName(orderDTO.getAddressName());
         order.setAddressPhone(orderDTO.getAddressPhone());
-        order.setCommented(false);
         order.setStatus(1); // 未支付
         // 保存订单
         this.save(order);

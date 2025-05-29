@@ -10,7 +10,7 @@ import lombok.Data;
 public class OrderCreateDTO {
     private Long shopId;
     private String shopName;
-    private String shopImage;
+    private List<String> shopImage;
     private Long amount;
     private Integer payType;
     private Integer status;

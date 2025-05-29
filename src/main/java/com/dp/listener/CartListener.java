@@ -8,14 +8,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Resource;
 
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -41,18 +43,31 @@ public class CartListener {
     @Resource
     private ICartService cartService;
 
+    @Resource
+    private RedissonClient redissonClient;
+
     /**
      * Redis购物车KEY前缀
      */
     private static final String CART_KEY_PREFIX = "cart:user:";
+    private static final String CART_SYNC_LOCK_PREFIX = "cart:sync:";
 
     /**
      * 监听购物车保存消息，将Redis中的购物车数据同步到数据库
      */
-    @RabbitListener(queues = "cart.save.queue")
-    @Transactional
+    @RabbitListener(queues = "cart.save.queue", concurrency = "3")
     public void listenCartSave(Long userId, Message message, Channel channel) throws IOException {
+        // 创建分布式锁，确保同一用户的购物车同步是串行的
+        RLock lock = redissonClient.getLock(CART_SYNC_LOCK_PREFIX + userId);
+
         try {
+            // 尝试获取锁，等待1秒
+            if (!lock.tryLock(1, 10, TimeUnit.SECONDS)) {
+                // 如果获取不到锁，重新入队处理
+                channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
+                return;
+            }
+
             log.info("接收到购物车保存消息，用户ID：{}", userId);
 
             // 同步购物车数据到数据库
@@ -61,8 +76,15 @@ public class CartListener {
             // 手动确认消息
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
-            log.error("处理购物车保存消息异常", e);
-            channel.basicReject(message.getMessageProperties().getDeliveryTag(), true);
+            log.error("购物车同步失败: {}", userId, e);
+            // 如果是业务逻辑错误，直接丢弃消息；如果是网络等临时错误，重新入队
+            boolean requeue = e instanceof IOException;
+            channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, requeue);
+        } finally {
+            // 释放锁
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
@@ -91,22 +113,27 @@ public class CartListener {
         // 解析Redis中的购物车数据
         List<ShopCartDTO> cartList = JSONUtil.toList(cartJson, ShopCartDTO.class);
 
-        // 获取数据库中现有的购物车数据
-        List<Cart> existingCarts = cartService.list(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
-        Map<String, Cart> existingCartMap = new HashMap<>();
+        // 使用批处理提高性能
+        processBatchCartSync(userId, cartList);
+    }
 
-        // 创建复合键（商品ID+SKU ID）到购物车项的映射
+    private void processBatchCartSync(Long userId, List<ShopCartDTO> cartList) {
+        // 查询现有购物车记录，只查询必要字段
+        List<Cart> existingCarts = cartService.list(
+                new LambdaQueryWrapper<Cart>()
+                        .select(Cart::getId, Cart::getGoodsId, Cart::getSkuId, Cart::getCount, Cart::getChecked)
+                        .eq(Cart::getUserId, userId));
+
+        // 创建复合键到购物车项的映射
+        Map<String, Cart> existingCartMap = new HashMap<>(existingCarts.size());
         for (Cart cart : existingCarts) {
-            String key = cart.getGoodsId() + "-" + (cart.getSkuId() == null ? "null" : cart.getSkuId());
+            String key = cart.getGoodsId() + ":" + (cart.getSkuId() == null ? "null" : cart.getSkuId());
             existingCartMap.put(key, cart);
         }
 
-        // 将Redis中的购物车数据与数据库比对并更新
+        // 批量处理：更新、插入、删除
         List<Cart> cartsToUpdate = new ArrayList<>();
         List<Cart> cartsToInsert = new ArrayList<>();
-        List<Long> cartsToDelete = new ArrayList<>();
-
-        // 记录Redis中存在的项目
         Set<String> redisCartKeys = new HashSet<>();
 
         // 处理Redis中的购物车数据
@@ -116,16 +143,18 @@ public class CartListener {
             }
 
             for (CartItemDTO item : shopCart.getItems()) {
-                String key = item.getGoodsId() + "-" + (item.getSkuId() == null ? "null" : item.getSkuId());
+                String key = item.getGoodsId() + ":" + (item.getSkuId() == null ? "null" : item.getSkuId());
                 redisCartKeys.add(key);
 
                 Cart existingCart = existingCartMap.get(key);
                 if (existingCart != null) {
-                    // 更新现有项
-                    existingCart.setCount(item.getCount());
-                    existingCart.setChecked(item.getChecked());
-                    existingCart.setUpdateTime(LocalDateTime.now());
-                    cartsToUpdate.add(existingCart);
+                    // 只在数据真正变更时才更新
+                    if (existingCart.getCount() != item.getCount() || existingCart.getChecked() != item.getChecked()) {
+                        existingCart.setCount(item.getCount());
+                        existingCart.setChecked(item.getChecked());
+                        existingCart.setUpdateTime(LocalDateTime.now());
+                        cartsToUpdate.add(existingCart);
+                    }
                 } else {
                     // 添加新项
                     Cart newCart = new Cart();
@@ -141,14 +170,15 @@ public class CartListener {
             }
         }
 
-        // 找出数据库中有但Redis中没有的项（需要删除）
+        // 找出要删除的项
+        List<Long> idsToRemove = new ArrayList<>();
         for (Map.Entry<String, Cart> entry : existingCartMap.entrySet()) {
             if (!redisCartKeys.contains(entry.getKey())) {
-                cartsToDelete.add(entry.getValue().getId());
+                idsToRemove.add(entry.getValue().getId());
             }
         }
 
-        // 批量更新数据库
+        // 批量执行数据库操作
         if (!cartsToUpdate.isEmpty()) {
             cartService.updateBatchById(cartsToUpdate);
         }
@@ -157,11 +187,11 @@ public class CartListener {
             cartService.saveBatch(cartsToInsert);
         }
 
-        if (!cartsToDelete.isEmpty()) {
-            cartService.removeByIds(cartsToDelete);
+        if (!idsToRemove.isEmpty()) {
+            cartService.removeByIds(idsToRemove);
         }
 
         log.info("用户[{}]购物车数据已同步到数据库，更新{}件，新增{}件，删除{}件",
-                userId, cartsToUpdate.size(), cartsToInsert.size(), cartsToDelete.size());
+                userId, cartsToUpdate.size(), cartsToInsert.size(), idsToRemove.size());
     }
 }
