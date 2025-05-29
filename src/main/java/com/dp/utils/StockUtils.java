@@ -33,17 +33,17 @@ public class StockUtils {
     /**
      * Redis商品库存KEY前缀
      */
-    private static final String GOODS_STOCK_KEY_PREFIX = "goods:stock:";
+    public static final String GOODS_STOCK_KEY_PREFIX = "stock:goods:";
 
     /**
      * Redis SKU库存KEY前缀
      */
-    private static final String SKU_STOCK_KEY_PREFIX = "sku:stock:";
+    public static final String SKU_STOCK_KEY_PREFIX = "stock:sku:";
 
     /**
      * 库存数据缓存时间(天)
      */
-    private static final int STOCK_EXPIRE_DAYS = 1;
+    public static final int STOCK_EXPIRE_DAYS = 1;
 
     /**
      * 获取商品库存(优先从Redis获取，不存在则从数据库获取并同步到Redis)
@@ -123,5 +123,63 @@ public class StockUtils {
         }
 
         return true;
+    }
+
+    /**
+     * 更新商品库存缓存
+     *
+     * @param goodsId 商品ID
+     * @param stock   新的库存数量
+     */
+    public void updateGoodsStockCache(Long goodsId, Integer stock) {
+        if (goodsId == null || stock == null) {
+            return;
+        }
+        String key = GOODS_STOCK_KEY_PREFIX + goodsId;
+        stringRedisTemplate.opsForValue().set(key, stock.toString(), STOCK_EXPIRE_DAYS, TimeUnit.DAYS);
+        log.info("更新商品库存缓存，商品ID：{}，新库存：{}", goodsId, stock);
+    }
+
+    /**
+     * 更新SKU库存缓存
+     *
+     * @param skuId SKU ID
+     * @param stock 新的库存数量
+     */
+    public void updateSkuStockCache(Long skuId, Integer stock) {
+        if (skuId == null || stock == null) {
+            return;
+        }
+        String key = SKU_STOCK_KEY_PREFIX + skuId;
+        stringRedisTemplate.opsForValue().set(key, stock.toString(), STOCK_EXPIRE_DAYS, TimeUnit.DAYS);
+        log.info("更新SKU库存缓存，SKU ID：{}，新库存：{}", skuId, stock);
+    }
+
+    /**
+     * 删除商品库存缓存
+     *
+     * @param goodsId 商品ID
+     */
+    public void deleteGoodsStockCache(Long goodsId) {
+        if (goodsId == null) {
+            return;
+        }
+        String key = GOODS_STOCK_KEY_PREFIX + goodsId;
+        stringRedisTemplate.delete(key);
+        log.info("删除商品库存缓存，商品ID：{}", goodsId);
+    }
+
+    /**
+     * 删除SKU库存缓存
+     *
+     * @param skuId SKU ID
+     */
+    public void deleteSkuStockCache(Long skuId) {
+        if (skuId == null) {
+            return;
+        }
+        String key = SKU_STOCK_KEY_PREFIX + skuId;
+        stringRedisTemplate.delete(key);
+        log.info("删除SKU库存缓存，SKU ID：{}", skuId);
     }
 }

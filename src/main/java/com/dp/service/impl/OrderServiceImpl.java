@@ -43,6 +43,7 @@ import com.dp.service.IGoodsService;
 import com.dp.service.IOrderItemsService;
 import com.dp.service.IOrderService;
 import com.dp.utils.RedisConstants;
+import com.dp.utils.StockUtils;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -71,6 +72,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Resource
     private OrderMapper orderMapper;
+
+    @Resource
+    private StockUtils stockUtils;
 
     @Override
     @Transactional
@@ -123,25 +127,38 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         // 库存扣减
         for (OrderItems orderItem : orderItemsList) {
+            Long goodsId = orderItem.getGoodsId();
+            Long skuId = orderItem.getSkuId();
+            Integer count = orderItem.getCount();
+
+            // 先使用StockUtils检查库存是否充足
+            if (!stockUtils.hasEnoughStock(goodsId, skuId, count)) {
+                throw new RuntimeException("库存不足，无法下单");
+            }
+
             // 如果有SKU，则扣减SKU库存
-            if (orderItem.getSkuId() != null) {
+            if (skuId != null) {
                 boolean success = goodSKUService.update()
-                        .setSql("stock = stock - " + orderItem.getCount())
-                        .eq("id", orderItem.getSkuId())
-                        .ge("stock", orderItem.getCount()) // 确保库存充足
+                        .setSql("stock = stock - " + count)
+                        .eq("id", skuId)
+                        .ge("stock", count) // 确保库存充足
                         .update();
                 if (!success) {
                     throw new RuntimeException("库存不足，无法下单");
                 }
                 // 扣减商品库存
                 boolean success1 = goodsService.update()
-                        .setSql("stock = stock - " + orderItem.getCount())
-                        .eq("id", orderItem.getGoodsId())
-                        .ge("stock", orderItem.getCount()) // 确保库存充足
+                        .setSql("stock = stock - " + count)
+                        .eq("id", goodsId)
+                        .ge("stock", count) // 确保库存充足
                         .update();
                 if (!success1) {
                     throw new RuntimeException("库存不足，无法下单");
                 }
+
+                // 删除Redis缓存中的库存数据
+                stockUtils.deleteGoodsStockCache(goodsId);
+                stockUtils.deleteSkuStockCache(skuId);
             }
         }
 
@@ -198,18 +215,22 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     .list();
 
             for (OrderItems orderItem : orderItems) {
+                Long goodsId = orderItem.getGoodsId();
+                Long skuId = orderItem.getSkuId();
+                Integer count = orderItem.getCount();
+
                 // 如果有SKU，则增加SKU销量
-                if (orderItem.getSkuId() != null) {
+                if (skuId != null) {
                     goodSKUService.update()
-                            .setSql("sold = sold + " + orderItem.getCount())
-                            .eq("id", orderItem.getSkuId())
+                            .setSql("sold = sold + " + count)
+                            .eq("id", skuId)
                             .update();
                 }
 
                 // 增加商品销量
                 goodsService.update()
-                        .setSql("sold = sold + " + orderItem.getCount())
-                        .eq("id", orderItem.getGoodsId())
+                        .setSql("sold = sold + " + count)
+                        .eq("id", goodsId)
                         .update();
             }
 
@@ -356,18 +377,28 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
             // 恢复库存
             for (OrderItems orderItem : orderItems) {
+                Long goodsId = orderItem.getGoodsId();
+                Long skuId = orderItem.getSkuId();
+                Integer count = orderItem.getCount();
+
                 // 如果有SKU，则恢复SKU库存
-                if (orderItem.getSkuId() != null) {
+                if (skuId != null) {
+                    // 恢复SKU库存
                     goodSKUService.update()
-                            .setSql("stock = stock + " + orderItem.getCount())
-                            .eq("id", orderItem.getSkuId())
+                            .setSql("stock = stock + " + count)
+                            .eq("id", skuId)
                             .update();
+
                     // 恢复商品库存
                     goodsService.update()
-                            .setSql("stock = stock + " + orderItem.getCount())
-                            .eq("id", orderItem.getGoodsId())
+                            .setSql("stock = stock + " + count)
+                            .eq("id", goodsId)
                             .update();
                 }
+
+                // 删除Redis缓存中的库存数据
+                stockUtils.deleteGoodsStockCache(goodsId);
+                stockUtils.deleteSkuStockCache(skuId);
             }
 
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
@@ -408,18 +439,28 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
             // 恢复库存
             for (OrderItems orderItem : orderItems) {
+                Long goodsId = orderItem.getGoodsId();
+                Long skuId = orderItem.getSkuId();
+                Integer count = orderItem.getCount();
+
                 // 如果有SKU，则恢复SKU库存
-                if (orderItem.getSkuId() != null) {
+                if (skuId != null) {
+                    // 恢复SKU库存
                     goodSKUService.update()
-                            .setSql("stock = stock + " + orderItem.getCount())
-                            .eq("id", orderItem.getSkuId())
+                            .setSql("stock = stock + " + count)
+                            .eq("id", skuId)
                             .update();
+
                     // 恢复商品库存
                     goodsService.update()
-                            .setSql("stock = stock + " + orderItem.getCount())
-                            .eq("id", orderItem.getGoodsId())
+                            .setSql("stock = stock + " + count)
+                            .eq("id", goodsId)
                             .update();
                 }
+
+                // 删除Redis缓存中的库存数据
+                stockUtils.deleteGoodsStockCache(goodsId);
+                stockUtils.deleteSkuStockCache(skuId);
             }
 
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
