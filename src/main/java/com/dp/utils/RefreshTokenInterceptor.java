@@ -9,10 +9,12 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import com.dp.dto.UserDTO;
 
 import cn.hutool.core.util.StrUtil;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 刷新token拦截器
  */
+@Slf4j
 @Component
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
@@ -36,6 +38,9 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
             // Access Token有效，从Access Token中提取用户信息并保存到ThreadLocal
             UserDTO userDTO = jwtUtils.extractUserFromAccessToken(accessToken);
             UserHolder.saveUser(userDTO);
+            log.debug("用户[{}]的AccessToken有效，已设置用户信息", userDTO.getId());
+        } else {
+            log.debug("请求中的AccessToken无效或已过期");
         }
         return true;
     }

@@ -181,20 +181,26 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 获取用户信息
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
-        //
-        // // 查询订单
+
+        // 记录支付请求
+        log.info("用户[{}]发起支付请求，订单ID: {}, 支付方式: {}", userId, orderId, payType);
+
+        // 查询订单
         Order order = getById(orderId);
         if (order == null) {
+            log.warn("支付失败：订单[{}]不存在", orderId);
             throw new RuntimeException("订单不存在");
         }
-        //
+
         // 校验订单归属
         if (!order.getUserId().equals(userId)) {
+            log.warn("支付失败：订单[{}]不属于用户[{}]", orderId, userId);
             throw new RuntimeException("订单不属于当前用户");
         }
 
         // 校验订单状态
         if (order.getStatus() != 1) {
+            log.warn("支付失败：订单[{}]状态异常，当前状态: {}", orderId, order.getStatus());
             throw new RuntimeException("订单状态异常");
         }
 
@@ -209,6 +215,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .update();
 
         if (success) {
+            log.info("用户[{}]支付成功，订单ID: {}", userId, orderId);
+
             // 增加销量
             List<OrderItems> orderItems = orderItemsService.query()
                     .eq("order_id", orderId)
@@ -235,6 +243,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             }
 
             stringRedisTemplate.delete(RedisConstants.ORDER_STATUS + order.getId());
+        } else {
+            log.warn("用户[{}]支付失败，订单ID: {}", userId, orderId);
         }
         return success;
     }

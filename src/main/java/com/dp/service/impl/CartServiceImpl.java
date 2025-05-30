@@ -374,9 +374,6 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
             if (entries.isEmpty()) {
                 // 从数据库加载购物车
                 cartList = loadCartFromDB(userId);
-                if (cartList.isEmpty()) {
-                    return Result.fail("购物车为空");
-                }
             } else {
                 cartList = convertHashToCartList(entries);
             }

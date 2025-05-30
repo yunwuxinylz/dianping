@@ -189,15 +189,6 @@ public class UserController {
         // 删除刷新令牌版本号
         String versionKey = RedisConstants.REFRESH_TOKEN_VERSION_KEY + userId + ":" + deviceFingerprint;
         stringRedisTemplate.delete(versionKey);
-
-        // 清除Refresh Token Cookie
-        Cookie cookie = new Cookie("refreshToken", null);
-        cookie.setMaxAge(0);
-        cookie.setPath("/api/user/refresh-token");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        response.addCookie(cookie);
-
         return Result.ok("登出成功");
     }
 

@@ -24,7 +24,7 @@ public class JwtUtils {
     private final static SecretKey REFRESH_TOKEN_SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
     // Access Token有效期: 15分钟
-    public static final long ACCESS_TOKEN_EXPIRATION = 10 * 60 * 1000;
+    public static final long ACCESS_TOKEN_EXPIRATION = 10 * 1000;
 
     // Refresh Token有效期: 15天
     public static final long REFRESH_TOKEN_EXPIRATION = 15 * 24 * 60 * 60 * 1000;

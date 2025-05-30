@@ -46,10 +46,11 @@ public class OrderController {
 
     /**
      * 支付订单
+     * 此接口需要验证refresh token，确保用户会话是完全有效的
      * 
-     * @param orderId
-     * @param payType
-     * @return
+     * @param orderId 订单ID
+     * @param payType 支付方式
+     * @return 支付结果
      */
     @PutMapping("/pay/{orderId}")
     public Result payOrder(@PathVariable Long orderId, @RequestParam Integer payType) {
@@ -165,6 +166,7 @@ public class OrderController {
 
     /**
      * 获取订单总数
+     * 
      * @return 订单总数
      */
     @GetMapping("/count")
@@ -172,8 +174,9 @@ public class OrderController {
         return orderService.getOrderCount();
     }
 
-     /**
+    /**
      * 获取今日销售额
+     * 
      * @return 今日销售额
      */
     @GetMapping("/today-sales")
@@ -183,6 +186,7 @@ public class OrderController {
 
     /**
      * 获取最近7天销售趋势
+     * 
      * @return 最近7天销售趋势数据
      */
     @GetMapping("/week-sales")
