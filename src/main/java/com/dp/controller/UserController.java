@@ -26,6 +26,7 @@ import com.dp.service.IUserService;
 import com.dp.utils.CaptchaUtils;
 import com.dp.utils.JwtUtils;
 import com.dp.utils.UserHolder;
+import com.dp.utils.RedisConstants;
 
 import cn.hutool.core.util.StrUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -182,8 +183,12 @@ public class UserController {
         String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
 
         // 从设备列表中删除
-        String deviceKey = "devices:" + userId;
+        String deviceKey = RedisConstants.USER_DEVICES_KEY + userId;
         stringRedisTemplate.opsForHash().delete(deviceKey, deviceFingerprint);
+
+        // 删除刷新令牌版本号
+        String versionKey = RedisConstants.REFRESH_TOKEN_VERSION_KEY + userId + ":" + deviceFingerprint;
+        stringRedisTemplate.delete(versionKey);
 
         // 清除Refresh Token Cookie
         Cookie cookie = new Cookie("refreshToken", null);

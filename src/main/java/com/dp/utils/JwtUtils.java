@@ -45,14 +45,28 @@ public class JwtUtils {
                 .compact();
     }
 
-    // 创建RefreshToken
-    public String generateRefreshToken(Long userId) {
+    // 创建带版本号的RefreshToken
+    public String generateRefreshToken(Long userId, String version) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("version", version);
+
         return Jwts.builder()
+                .setClaims(claims)
                 .setSubject(userId.toString())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
                 .signWith(REFRESH_TOKEN_SECRET_KEY)
                 .compact();
+    }
+
+    // 从RefreshToken中提取版本号
+    public String extractVersionFromRefreshToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(REFRESH_TOKEN_SECRET_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return (String) claims.get("version");
     }
 
     // 从AccessToken中提取UserDTO
@@ -105,5 +119,10 @@ public class JwtUtils {
         // 组合设备信息并哈希
         String deviceInfo = deviceId + ":" + userAgent + ":" + ipAddress;
         return DigestUtils.md5DigestAsHex(deviceInfo.getBytes());
+    }
+
+    // 生成随机版本号
+    public String generateTokenVersion() {
+        return DigestUtils.md5DigestAsHex(String.valueOf(System.currentTimeMillis()).getBytes());
     }
 }
