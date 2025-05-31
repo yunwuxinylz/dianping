@@ -21,7 +21,7 @@ import com.dp.entity.VoucherOrder;
 import com.dp.mapper.VoucherOrderMapper;
 import com.dp.service.ISeckillVoucherService;
 import com.dp.service.IVoucherOrderService;
-import com.dp.utils.RedisIdWorker;
+import com.dp.utils.SnowflakeIdWorker;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.json.JSONUtil;
@@ -42,7 +42,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private RedissonClient redissonClient;
     @Resource
-    private RedisIdWorker redisIdWorker;
+    private SnowflakeIdWorker snowflakeIdWorker;
 
     @Resource
     private ISeckillVoucherService seckillVoucherService;
@@ -79,7 +79,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 5.1.6.创建订单
         VoucherOrder voucherOrder = new VoucherOrder();
         // 5.1.6.1.订单id
-        long orderId = redisIdWorker.nextId("order");
+        long orderId = snowflakeIdWorker.nextId();
         voucherOrder.setId(orderId);
         // 5.1.6.2.用户id
         voucherOrder.setUserId(userId);

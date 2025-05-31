@@ -47,9 +47,10 @@ public class PayController {
      * 查询支付状态
      */
     @GetMapping("/status/{orderId}")
-    public Result queryPaymentStatus(@PathVariable Long orderId, @RequestParam Integer payType) {
-        log.info("查询支付状态: orderId={}, payType={}", orderId, payType);
-        return payService.queryPaymentStatus(orderId, payType);
+    public Result queryPaymentStatus(@PathVariable String orderId, @RequestParam Integer payType) {
+        Long orderIdLong = Long.parseLong(orderId);
+        log.info("查询支付状态: orderId={}, payType={}", orderIdLong, payType);
+        return payService.queryPaymentStatus(orderIdLong, payType);
     }
 
     /**

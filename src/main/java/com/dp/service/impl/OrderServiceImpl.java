@@ -43,6 +43,7 @@ import com.dp.service.IGoodsService;
 import com.dp.service.IOrderItemsService;
 import com.dp.service.IOrderService;
 import com.dp.utils.RedisConstants;
+import com.dp.utils.SnowflakeIdWorker;
 import com.dp.utils.StockUtils;
 import com.dp.utils.UserHolder;
 
@@ -60,18 +61,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final IGoodSKUService goodSKUService;
     private final RabbitTemplate rabbitTemplate;
     private final StringRedisTemplate stringRedisTemplate;
+    private final SnowflakeIdWorker snowflakeIdWorker;
 
     public OrderServiceImpl(IGoodsService goodsService, IOrderItemsService orderItemsService,
-            RabbitTemplate rabbitTemplate, StringRedisTemplate stringRedisTemplate, IGoodSKUService goodSKUService) {
+            RabbitTemplate rabbitTemplate, StringRedisTemplate stringRedisTemplate,
+            IGoodSKUService goodSKUService, SnowflakeIdWorker snowflakeIdWorker) {
         this.goodsService = goodsService;
         this.orderItemsService = orderItemsService;
         this.rabbitTemplate = rabbitTemplate;
         this.stringRedisTemplate = stringRedisTemplate;
         this.goodSKUService = goodSKUService;
+        this.snowflakeIdWorker = snowflakeIdWorker;
     }
-
-    @Resource
-    private OrderMapper orderMapper;
 
     @Resource
     private StockUtils stockUtils;
@@ -86,6 +87,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 创建订单
         Order order = new Order();
 
+        // 使用雪花算法生成订单ID
+        long orderId = snowflakeIdWorker.nextId();
+        order.setId(orderId);
+
         order.setUserId(userId);
         order.setShopId(orderDTO.getShopId());
         order.setShopName(orderDTO.getShopName());
@@ -94,10 +99,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             String shopImagesStr = String.join(",", shopImages);
             order.setShopImage(shopImagesStr);
         }
-
         order.setRemark(orderDTO.getRemark());
         order.setAmount(orderDTO.getAmount());
-        order.setPayType(orderDTO.getPayType());
         order.setCount(orderDTO.getCount());
         order.setCommented(false);
         order.setAddressId(orderDTO.getAddressId());
@@ -198,8 +201,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         // 转换为OrderDTO
         OrderDTO orderDTO = BeanUtil.copyProperties(order, OrderDTO.class);
+        orderDTO.setId(order.getId().toString());
         List<OrderItemsDTO> orderItemsDTO = orderItems.stream()
-                .map(item -> BeanUtil.copyProperties(item, OrderItemsDTO.class))
+                .map(item -> {
+                    OrderItemsDTO itemDTO = BeanUtil.copyProperties(item, OrderItemsDTO.class);
+                    if (item.getGoodsImage() != null) {
+                        itemDTO.setGoodsImage(Arrays.asList(item.getGoodsImage().split(",")));
+                    }
+                    return itemDTO;
+                })
                 .collect(Collectors.toList()); // 替换 toList() 为 collect(Collectors.toList())
         orderDTO.setItems(orderItemsDTO);
 
@@ -254,6 +264,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         List<OrderListDTO> records = orderPage.getRecords().stream()
                 .map(order -> {
                     OrderListDTO orderDTO = BeanUtil.copyProperties(order, OrderListDTO.class);
+                    orderDTO.setId(order.getId().toString());
                     // 获取订单的商品列表
                     List<OrderItems> items = orderItemsList.stream()
                             .filter(item -> item.getOrderId().equals(order.getId()))

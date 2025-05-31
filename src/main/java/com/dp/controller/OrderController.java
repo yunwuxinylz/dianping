@@ -41,7 +41,8 @@ public class OrderController {
     public Result createOrder(@RequestBody OrderCreateDTO orderDTO) {
         // 创建订单
         Long orderId = orderService.createOrder(orderDTO);
-        return Result.ok(orderId);
+        // 返回字符串形式的ID
+        return Result.ok(orderId.toString());
     }
 
     /**
@@ -85,15 +86,17 @@ public class OrderController {
     }
 
     /**
-     * 查询订单状态
+     * 查询订单详情
      * 
      * @param orderId
      * @return
      */
-    @GetMapping("/status/{orderId}")
-    public Result queryOrderStatus(@PathVariable Long orderId) {
+    @GetMapping("/detail/{orderId}")
+    public Result queryOrderDetail(@PathVariable String orderId) {
+        // 转换为Long类型
+        Long orderIdLong = Long.parseLong(orderId);
         // 查询订单
-        OrderDTO orderDTO = orderService.queryOrderById(orderId);
+        OrderDTO orderDTO = orderService.queryOrderById(orderIdLong);
         if (orderDTO == null) {
             return Result.fail("订单不存在");
         }
@@ -109,7 +112,7 @@ public class OrderController {
      */
     @PutMapping("/cancel")
     public Result cancelOrder(@RequestBody OrderCancelDTO orderCancelDTO) {
-        Long orderId = orderCancelDTO.getOrderId();
+        Long orderId = Long.parseLong(orderCancelDTO.getOrderId());
         String cancelReason = orderCancelDTO.getCancelReason();
         return orderService.cancelOrder(orderId, cancelReason);
     }
@@ -121,8 +124,9 @@ public class OrderController {
      * @return
      */
     @PutMapping("/confirm/{orderId}")
-    public Result deliveryOrder(@PathVariable Long orderId) {
-        return orderService.confirmOrder(orderId);
+    public Result deliveryOrder(@PathVariable String orderId) {
+        Long orderIdLong = Long.parseLong(orderId);
+        return orderService.confirmOrder(orderIdLong);
     }
 
     /**
@@ -132,8 +136,9 @@ public class OrderController {
      * @return
      */
     @PutMapping("/delivery/{orderId}")
-    public Result confirmOrder(@PathVariable Long orderId) {
-        return orderService.deliveryOrder(orderId);
+    public Result confirmOrder(@PathVariable String orderId) {
+        Long orderIdLong = Long.parseLong(orderId);
+        return orderService.deliveryOrder(orderIdLong);
     }
 
     /**
