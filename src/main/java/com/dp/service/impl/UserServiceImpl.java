@@ -204,17 +204,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         refreshTokenCookie.setSecure(true); // 仅HTTPS
         refreshTokenCookie.setPath("/api/user/refresh-token");
         refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
-
         response.addCookie(refreshTokenCookie);
-
-        // 创建HttpOnly Cookie存储Refresh Token
-        Cookie refreshTokenCookie2 = new Cookie("refreshToken", refreshToken);
-        refreshTokenCookie2.setHttpOnly(true);
-        refreshTokenCookie2.setSecure(true); // 仅HTTPS
-        refreshTokenCookie2.setPath("/api/order/pay");
-        refreshTokenCookie2.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
-
-        response.addCookie(refreshTokenCookie2);
 
         Map<String, Object> result = new HashMap<>();
         result.put("accessToken", accessToken);
@@ -322,14 +312,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 refreshTokenCookie.setPath("/api/user/refresh-token");
                 refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
                 response.addCookie(refreshTokenCookie);
-
-                // 为订单支付路径添加Cookie
-                Cookie refreshTokenCookie2 = new Cookie("refreshToken", newRefreshToken);
-                refreshTokenCookie2.setHttpOnly(true);
-                refreshTokenCookie2.setSecure(true); // 仅HTTPS
-                refreshTokenCookie2.setPath("/api/order/pay");
-                refreshTokenCookie2.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
-                response.addCookie(refreshTokenCookie2);
 
                 // 返回新的Access Token
                 return Result.ok(accessToken);

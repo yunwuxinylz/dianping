@@ -45,24 +45,6 @@ public class OrderController {
     }
 
     /**
-     * 支付订单
-     * 此接口需要验证refresh token，确保用户会话是完全有效的
-     * 
-     * @param orderId 订单ID
-     * @param payType 支付方式
-     * @return 支付结果
-     */
-    @PutMapping("/pay/{orderId}")
-    public Result payOrder(@PathVariable Long orderId, @RequestParam Integer payType) {
-        // 支付订单
-        boolean success = orderService.payOrder(orderId, payType);
-        if (!success) {
-            return Result.fail("支付失败");
-        }
-        return Result.ok();
-    }
-
-    /**
      * 获取订单列表，支持多种筛选条件
      * 
      * @param status

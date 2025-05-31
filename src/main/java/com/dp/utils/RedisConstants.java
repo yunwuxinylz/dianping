@@ -19,7 +19,7 @@ public class RedisConstants {
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
 
     public static final String ORDER_STATUS = "order:status:";
-    public static final Long ORDER_STATUS_TTL = 35L;
+    public static final Long ORDER_STATUS_TTL = 20L;
 
     // 刷新令牌版本号的键前缀
     public static final String REFRESH_TOKEN_VERSION_KEY = "rtv:";

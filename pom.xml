@@ -167,6 +167,12 @@
             <artifactId>springdoc-openapi-javadoc</artifactId>
             <version>1.7.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.35.101.ALL</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -2,10 +2,9 @@ package com.dp.controller;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -25,8 +24,8 @@ import com.dp.entity.UserInfo;
 import com.dp.service.IUserService;
 import com.dp.utils.CaptchaUtils;
 import com.dp.utils.JwtUtils;
-import com.dp.utils.UserHolder;
 import com.dp.utils.RedisConstants;
+import com.dp.utils.UserHolder;
 
 import cn.hutool.core.util.StrUtil;
 import io.swagger.v3.oas.annotations.Operation;
