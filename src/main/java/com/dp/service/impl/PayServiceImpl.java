@@ -16,15 +16,16 @@ import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.alipay.api.request.AlipayTradeQueryRequest;
 import com.alipay.api.response.AlipayTradeQueryResponse;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.config.AlipayConfig;
 import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
 import com.dp.entity.Order;
 import com.dp.entity.OrderItems;
+import com.dp.mapper.OrderMapper;
 import com.dp.service.IGoodSKUService;
 import com.dp.service.IGoodsService;
 import com.dp.service.IOrderItemsService;
-import com.dp.service.IOrderService;
 import com.dp.service.IPayService;
 import com.dp.utils.RedisConstants;
 import com.dp.utils.UserHolder;
@@ -35,10 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PayServiceImpl implements IPayService {
+public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements IPayService {
 
     private final AlipayConfig alipayConfig;
-    private final IOrderService orderService;
     private final IGoodsService goodsService;
     private final IGoodSKUService goodSKUService;
     private final IOrderItemsService orderItemsService;
@@ -191,7 +191,7 @@ public class PayServiceImpl implements IPayService {
     @Transactional
     public boolean confirmOrderPayment(Long orderId, Integer payType) {
         // 查询订单
-        Order order = orderService.getById(orderId);
+        Order order = this.getById(orderId);
         if (order == null) {
             log.warn("支付失败：订单[{}]不存在", orderId);
             throw new RuntimeException("订单不存在");
@@ -204,7 +204,7 @@ public class PayServiceImpl implements IPayService {
         }
 
         // 更新订单状态
-        boolean success = orderService.update()
+        boolean success = this.update()
                 .set("status", 2) // 已支付
                 .set("pay_time", LocalDateTime.now())
                 .set("pay_type", payType)
@@ -252,7 +252,7 @@ public class PayServiceImpl implements IPayService {
     public Result queryPaymentStatus(Long orderId, Integer payType) {
         try {
             // 查询订单状态
-            Order order = orderService.getById(orderId);
+            Order order = this.getById(orderId);
             if (order == null) {
                 return Result.fail("订单不存在");
             }
@@ -332,7 +332,7 @@ public class PayServiceImpl implements IPayService {
         Long userId = user.getId();
 
         // 查询订单
-        Order order = orderService.getById(orderId);
+        Order order = this.getById(orderId);
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }

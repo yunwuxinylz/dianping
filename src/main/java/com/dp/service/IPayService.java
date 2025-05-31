@@ -2,9 +2,11 @@ package com.dp.service;
 
 import java.util.Map;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.dp.dto.Result;
+import com.dp.entity.Order;
 
-public interface IPayService {
+public interface IPayService extends IService<Order> {
     /**
      * 创建支付宝支付订单
      * 

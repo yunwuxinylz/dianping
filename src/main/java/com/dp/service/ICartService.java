@@ -1,14 +1,12 @@
 package com.dp.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.dp.dto.CartItemDTO;
 import com.dp.dto.Result;
-import com.dp.entity.Cart;
 
 /**
  * 购物车服务接口
  */
-public interface ICartService extends IService<Cart> {
+public interface ICartService {
 
     /**
      * 获取用户购物车
