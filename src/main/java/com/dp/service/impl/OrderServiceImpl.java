@@ -544,7 +544,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     .stream()
                     .mapToLong(Order::getAmount)
                     .sum();
-
             return Result.ok(todaySales);
         } catch (Exception e) {
             log.error("获取今日销售额失败", e);
@@ -571,7 +570,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             // 按日期分组计算每天的销售额
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Map<String, Long> dailySales = new TreeMap<>(); // 使用TreeMap保持日期顺序
-
+          
             // 初始化最近7天的每一天
             for (int i = 6; i >= 0; i--) {
                 String dayStr = today.minusDays(i).format(formatter);
@@ -586,6 +585,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 }
             });
 
+
             // 转换为前端需要的数据格式
             List<Map<String, Object>> result = dailySales.entrySet().stream()
                     .map(entry -> {
@@ -595,7 +595,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                         return item;
                     })
                     .collect(Collectors.toList());
-
+          
             return Result.ok(result);
         } catch (Exception e) {
             log.error("获取最近7天销售趋势失败", e);

@@ -21,6 +21,7 @@ public interface IGoodsService extends IService<Goods> {
 
     Result goodsRecommendList(Integer count);
 
+
     Result getGoodsCount(); // 添加获取商品总数的方法声明
 
     Result adminGoodsList(String name, Long shopId, Integer status, Integer pageSize, Integer current);
@@ -32,4 +33,5 @@ public interface IGoodsService extends IService<Goods> {
     Result deleteGoods(Long id);
 
     Result addGoods(Goods goods);
+
 }

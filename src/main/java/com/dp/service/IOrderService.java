@@ -33,6 +33,7 @@ public interface IOrderService extends IService<Order> {
 
     Result getWeekSales();
 
+
     /**
      * 分页获取订单列表（支持搜索）
      */
@@ -42,4 +43,5 @@ public interface IOrderService extends IService<Order> {
      * 更新订单状态
      */
     Result updateOrderStatus(Long id, Integer status);
+
 }

@@ -151,6 +151,7 @@ public class ShopController {
         return shopService.getShopTypeStats();
     }
 
+
     /**
      * 获取店铺列表
      * @return 店铺列表
@@ -159,4 +160,5 @@ public class ShopController {
     public Result getShopList() {
         return shopService.getShopList();
     }
+
 }

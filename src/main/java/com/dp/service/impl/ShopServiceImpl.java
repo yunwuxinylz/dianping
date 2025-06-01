@@ -256,6 +256,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
     }
 
+
     @Override
     public Result getShopList() {
         // 查询所有店铺
