@@ -21,9 +21,9 @@ public class Order implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 订单ID，自增主键
+     * 订单ID，使用雪花算法生成
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.INPUT)
     private Long id;
 
     /**

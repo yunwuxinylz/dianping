@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import com.dp.config.RabbitMQConfig;
-import com.dp.service.impl.OrderServiceImpl;
+import com.dp.service.IOrderStatusService;
 import com.dp.utils.RedisConstants;
 import com.rabbitmq.client.Channel;
 
@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class OrderCancelListener {
     @Resource
-    private OrderServiceImpl orderService;
+    private IOrderStatusService orderStatusService;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -55,7 +55,7 @@ public class OrderCancelListener {
                 log.info("订单{}未支付", orderId);
 
                 // 重新发送消息，设置新的延迟时间
-                log.info("第{}次重试", retryCount + 1);
+                log.info("第{}次重试", retryCount);
                 MessageProperties props = message.getMessageProperties();
                 props.setHeader("retry-count", retryCount + 1);
                 Message newMessage = new Message(message.getBody(), props);
@@ -71,7 +71,7 @@ public class OrderCancelListener {
                 channel.basicAck(deliveryTag, false);
             } else {
                 log.info("订单{}已重试{}次，执行取消", orderId, retryCount);
-                orderService.rabbitCancelOrder(Long.valueOf(orderId), "超时自动取消，未支付");
+                orderStatusService.rabbitCancelOrder(Long.valueOf(orderId), "超时自动取消，未支付");
                 channel.basicAck(deliveryTag, false);
             }
         } catch (Exception e) {

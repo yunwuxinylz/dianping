@@ -3,15 +3,15 @@ package com.dp.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
 
 import com.dp.dto.GoodsDTO;
 import com.dp.dto.Result;
@@ -85,18 +85,6 @@ public class GoodsController {
         return goodsService.goodsRecommendList(count);
     }
 
-    
-    /**
-     * 获取商品总数
-     * @return 商品总数
-     */
-    @GetMapping("/count")
-    public Result getGoodsCount() {
-        return goodsService.getGoodsCount();
-    }
-
-
-
     /**
      * 获取商品总数
      * 
@@ -105,44 +93,6 @@ public class GoodsController {
     @GetMapping("/count")
     public Result getGoodsCount() {
         return goodsService.getGoodsCount();
-    }
-
-    /**
-     * 更新库存
-     * 
-     * @param goodsId
-     * @param goodsCount
-     * @return
-     */
-    @PutMapping("/stock")
-    public Result updateStock(@RequestBody Map<String, Integer> goodsIdAndCount) {
-        Long goodsId = Long.valueOf(goodsIdAndCount.get("goodsId"));
-        Integer goodsCount = goodsIdAndCount.get("count");
-        Long skuId = Long.valueOf(goodsIdAndCount.get("skuId"));
-        if (goodsId == null || goodsCount == null || skuId == null) {
-            return Result.fail("参数错误");
-        }
-
-        return goodsService.updateStock(goodsId, goodsCount, skuId);
-    }
-
-    /**
-     * 更新销量
-     *
-     * @param goodsId
-     * @param goodsCount
-     * @return
-     */
-    @PutMapping("/sold")
-    public Result updateSold(@RequestBody Map<String, Integer> goodsIdAndCount) {
-        Long goodsId = Long.valueOf(goodsIdAndCount.get("goodsId"));
-        Integer goodsCount = goodsIdAndCount.get("count");
-        Long skuId = Long.valueOf(goodsIdAndCount.get("skuId"));
-        if (goodsId == null || goodsCount == null || skuId == null) {
-            return Result.fail("参数错误");
-        }
-
-        return goodsService.updateSold(goodsId, goodsCount, skuId);
     }
 
     /**

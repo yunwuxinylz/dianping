@@ -1,6 +1,9 @@
 package com.dp.service.impl;
 
+import static com.dp.utils.RedisConstants.LOCK_REFRESH_TOKEN_KEY;
 import static com.dp.utils.RedisConstants.LOGIN_CODE_TTL;
+import static com.dp.utils.RedisConstants.REFRESH_TOKEN_VERSION_KEY;
+import static com.dp.utils.RedisConstants.USER_DEVICES_KEY;
 import static com.dp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 import java.time.LocalDateTime;
@@ -132,7 +135,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         Boolean isAdmin = user.getIsAdmin();
         String accessToken = jwtUtils.generateAccessToken(userDTO);
-        String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
+
+        // 生成刷新令牌版本号
+        String tokenVersion = jwtUtils.generateTokenVersion();
+        // 使用带版本号的刷新令牌
+        String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId(), tokenVersion);
 
         // 登录时存储多设备指纹
         String deviceId = request.getHeader("X-Device-ID");
@@ -140,7 +147,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
 
         // 创建分布式锁
-        String lockKey = "lock:user:devices:" + userDTO.getId();
+        String lockKey = LOCK_REFRESH_TOKEN_KEY + userDTO.getId();
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
@@ -149,7 +156,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
             if (locked) {
                 // 获取设备列表
-                String deviceKey = "devices:" + userDTO.getId();
+                String deviceKey = USER_DEVICES_KEY + userDTO.getId();
                 Map<Object, Object> deviceMap = stringRedisTemplate.opsForHash().entries(deviceKey);
 
                 // 检查当前设备是否已经登录
@@ -178,6 +185,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                     stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
                 }
 
+                // 存储刷新令牌版本号
+                String versionKey = REFRESH_TOKEN_VERSION_KEY + userDTO.getId() + ":"
+                        + deviceFingerprint;
+                stringRedisTemplate.opsForValue().set(versionKey, tokenVersion, JwtUtils.REFRESH_TOKEN_EXPIRATION,
+                        TimeUnit.MILLISECONDS);
+
                 // 设置过期时间
                 stringRedisTemplate.expire(deviceKey, JwtUtils.REFRESH_TOKEN_EXPIRATION, TimeUnit.MILLISECONDS);
             } else {
@@ -199,7 +212,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         refreshTokenCookie.setSecure(true); // 仅HTTPS
         refreshTokenCookie.setPath("/api/user/refresh-token");
         refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
-
         response.addCookie(refreshTokenCookie);
 
         Map<String, Object> result = new HashMap<>();
@@ -373,13 +385,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("用户不存在");
         }
 
-        // 验证设备指纹
+        // 获取设备指纹
         String deviceId = request.getHeader("X-Device-ID");
         String userAgent = request.getHeader("User-Agent");
         String currentFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
 
         // 检查此设备是否在已授权设备列表中
-        Boolean isKnownDevice = stringRedisTemplate.opsForHash().hasKey("devices:" + userId, currentFingerprint);
+        Boolean isKnownDevice = stringRedisTemplate.opsForHash().hasKey(USER_DEVICES_KEY + userId, currentFingerprint);
 
         if (Boolean.FALSE.equals(isKnownDevice)) {
             // 可选：记录可疑的刷新令牌尝试
@@ -387,12 +399,75 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("设备未授权，请重新登录");
         }
 
-        // 生成新的Access Token
-        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        String accessToken = jwtUtils.generateAccessToken(userDTO);
+        // 获取版本号
+        String storedVersionKey = REFRESH_TOKEN_VERSION_KEY + userId + ":" + currentFingerprint;
+        String storedVersion = stringRedisTemplate.opsForValue().get(storedVersionKey);
 
-        // 返回新的Access Token
-        return Result.ok(accessToken);
+        if (storedVersion == null) {
+            return Result.fail("刷新令牌已失效，请重新登录");
+        }
+
+        // 从刷新令牌中提取版本号
+        String tokenVersion;
+        try {
+            tokenVersion = jwtUtils.extractVersionFromRefreshToken(refreshToken);
+        } catch (Exception e) {
+            log.error("从刷新令牌中提取版本号失败", e);
+            return Result.fail("无效的刷新令牌");
+        }
+
+        // 验证版本号是否匹配
+        if (!storedVersion.equals(tokenVersion)) {
+            log.warn("刷新令牌版本号不匹配: userId={}, expected={}, actual={}", userId, storedVersion, tokenVersion);
+            return Result.fail("刷新令牌已失效，请重新登录");
+        }
+
+        // 创建分布式锁
+        String lockKey = LOCK_REFRESH_TOKEN_KEY + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // 尝试获取锁
+            boolean locked = lock.tryLock(1, 5, TimeUnit.SECONDS);
+
+            if (locked) {
+                // 更新版本号
+                String newVersion = jwtUtils.generateTokenVersion();
+                stringRedisTemplate.opsForValue().set(storedVersionKey, newVersion, JwtUtils.REFRESH_TOKEN_EXPIRATION,
+                        TimeUnit.MILLISECONDS);
+
+                // 生成新的Access Token和Refresh Token
+                UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+                String accessToken = jwtUtils.generateAccessToken(userDTO);
+                String newRefreshToken = jwtUtils.generateRefreshToken(userId, newVersion);
+
+                // 更新设备最后活动时间
+                stringRedisTemplate.opsForHash().put(USER_DEVICES_KEY + userId, currentFingerprint,
+                        LocalDateTime.now().toString());
+
+                // 更新Refresh Token Cookie
+                Cookie refreshTokenCookie = new Cookie("refreshToken", newRefreshToken);
+                refreshTokenCookie.setHttpOnly(true);
+                refreshTokenCookie.setSecure(true);
+                refreshTokenCookie.setPath("/api/user/refresh-token");
+                refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
+                response.addCookie(refreshTokenCookie);
+
+                // 返回新的Access Token
+                return Result.ok(accessToken);
+            } else {
+                log.warn("用户[{}]刷新令牌时锁获取超时", userId);
+                return Result.fail("系统繁忙，请稍后再试");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取锁过程被中断", e);
+            return Result.fail("操作被中断");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
     // 注册

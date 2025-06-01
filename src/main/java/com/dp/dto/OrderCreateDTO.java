@@ -1,6 +1,5 @@
 package com.dp.dto;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import lombok.Data;
@@ -10,11 +9,9 @@ import lombok.Data;
 public class OrderCreateDTO {
     private Long shopId;
     private String shopName;
-    private String shopImage;
+    private List<String> shopImage;
     private Long amount;
-    private Integer payType;
     private Integer status;
-    private LocalDateTime payTime;
     private List<OrderItemsDTO> items;
     /**
      * 订单备注

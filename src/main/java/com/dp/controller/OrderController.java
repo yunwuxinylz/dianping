@@ -16,53 +16,41 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.dp.dto.OrderCancelDTO;
 import com.dp.dto.OrderCreateDTO;
-import com.dp.dto.OrderDTO;
 import com.dp.dto.OrderQueryDTO;
-import com.dp.dto.OrderStatusDTO;
 import com.dp.dto.Result;
-import com.dp.enums.OrderStatus;
+import com.dp.service.IOrderAnalysisService;
 import com.dp.service.IOrderService;
+import com.dp.service.IOrderStatusService;
 
-// 订单Controller
+/**
+ * 订单Controller
+ */
 @RestController
 @RequestMapping("/order")
 public class OrderController {
     private final IOrderService orderService;
+    private final IOrderStatusService orderStatusService;
+    private final IOrderAnalysisService orderAnalysisService;
 
-    public OrderController(IOrderService orderService) {
+    public OrderController(IOrderService orderService,
+            IOrderStatusService orderStatusService,
+            IOrderAnalysisService orderAnalysisService) {
         this.orderService = orderService;
+        this.orderStatusService = orderStatusService;
+        this.orderAnalysisService = orderAnalysisService;
     }
 
     /**
      * 创建订单
-     * 
-     * @param orderDTO
-     * @return
      */
     @PostMapping("/create")
     public Result createOrder(@RequestBody OrderCreateDTO orderDTO) {
         // 创建订单
-        Long orderId = orderService.createOrder(orderDTO);
-        return Result.ok(orderId);
-    }
-
-    /**
-     * 支付订单
-     */
-    @PutMapping("/pay/{id}")
-    public Result payOrder(@PathVariable Long id) {
-        return orderService.updateOrderStatus(id, OrderStatus.PAID.getValue());
+        return orderService.createOrder(orderDTO);
     }
 
     /**
      * 获取订单列表，支持多种筛选条件
-     * 
-     * @param status
-     * @param statuses
-     * @param uncommented
-     * @param current
-     * @param pageSize
-     * @return
      */
     @GetMapping("/list")
     public Result getOrderList(
@@ -95,81 +83,50 @@ public class OrderController {
     }
 
     /**
-     * 查询订单状态
-     * 
-     * @param orderId
-     * @return
+     * 查询订单详情
      */
-    @GetMapping("/status/{orderId}")
-    public Result queryOrderStatus(@PathVariable Long orderId) {
-        // 查询订单
-        OrderDTO orderDTO = orderService.queryOrderById(orderId);
-        if (orderDTO == null) {
-            return Result.fail("订单不存在");
-        }
-        return Result.ok(orderDTO);
+    @GetMapping("/detail/{orderId}")
+    public Result queryOrderDetail(@PathVariable String orderId) {
+        // 转换为Long类型
+        Long orderIdLong = Long.parseLong(orderId);
+
+        return orderService.queryOrderById(orderIdLong);
     }
 
     /**
      * 取消订单
-     * 
-     * @param orderId
-     * @param cancelReason
-     * @return
      */
     @PutMapping("/cancel")
     public Result cancelOrder(@RequestBody OrderCancelDTO orderCancelDTO) {
-        Long orderId = orderCancelDTO.getOrderId();
+        Long orderId = Long.parseLong(orderCancelDTO.getOrderId());
         String cancelReason = orderCancelDTO.getCancelReason();
-        return orderService.cancelOrder(orderId, cancelReason);
+        return orderStatusService.cancelOrder(orderId, cancelReason);
     }
 
     /**
      * 商家发货
      */
-    @PutMapping("/ship/{id}")
-    public Result shipOrder(@PathVariable Long id) {
-        return orderService.updateOrderStatus(id, OrderStatus.SHIPPED.getValue());
+    @PutMapping("/confirm/{orderId}")
+    public Result confirmOrder(@PathVariable String orderId) {
+        Long orderIdLong = Long.parseLong(orderId);
+        return orderStatusService.confirmOrder(orderIdLong);
     }
 
     /**
-     * 统计图形
-     * 
-     * @return
+     * 确认收货
+     */
+    @PutMapping("/delivery/{orderId}")
+    public Result deliveryOrder(@PathVariable String orderId) {
+        Long orderIdLong = Long.parseLong(orderId);
+        return orderStatusService.deliveryOrder(orderIdLong);
+    }
+
+    /**
+     * 获取订单统计图表数据
      */
     @GetMapping("/statistics")
     public Result getOrderStatistics() {
-        return orderService.getOrderStatistics();
-    }
-
-    /**
-     * 获取订单总数
-     * 
-     * @return 订单总数
-     */
-    @GetMapping("/count")
-    public Result getOrderCount() {
-        return orderService.getOrderCount();
-    }
-
-    /**
-     * 获取今日销售额
-     * 
-     * @return 今日销售额
-     */
-    @GetMapping("/today-sales")
-    public Result getTodaySales() {
-        return orderService.getTodaySales();
-    }
-
-    /**
-     * 获取最近7天销售趋势
-     * 
-     * @return 最近7天销售趋势数据
-     */
-    @GetMapping("/week-sales")
-    public Result getWeekSales() {
-        return orderService.getWeekSales();
+        return orderAnalysisService.getOrderStatistics();
     }
 
     /**
@@ -185,53 +142,26 @@ public class OrderController {
     }
 
     /**
-     * 确认收货
-     */
-    @PutMapping("/delivery/{id}")
-    public Result deliveryOrder(@PathVariable("id") Long id) {
-        if (id == null) {
-            return Result.fail("订单ID不能为空");
-        }
-        // 将订单状态改为已完成(5)
-        return orderService.updateOrderStatus(id, OrderStatus.COMPLETED.getValue());
-    }
-
-    /**
-     * 更新订单状态
-     */
-    @PutMapping("/update/status/{id}")
-    public Result updateOrderStatus(@PathVariable("id") Long id, @RequestBody OrderStatusDTO statusDTO) {
-        if (id == null) {
-            return Result.fail("订单ID不能为空");
-        }
-        // 更新订单状态
-        return orderService.updateOrderStatus(id, statusDTO.getStatus());
-    }
-
-    /**
      * 获取订单总数
-     * @return 订单总数
      */
     @GetMapping("/count")
     public Result getOrderCount() {
-        return orderService.getOrderCount();
+        return orderAnalysisService.getOrderCount();
     }
 
-     /**
+    /**
      * 获取今日销售额
-     * @return 今日销售额
      */
     @GetMapping("/today-sales")
     public Result getTodaySales() {
-        return orderService.getTodaySales();
+        return orderAnalysisService.getTodaySales();
     }
 
     /**
      * 获取最近7天销售趋势
-     * @return 最近7天销售趋势数据
      */
     @GetMapping("/week-sales")
     public Result getWeekSales() {
-        return orderService.getWeekSales();
+        return orderAnalysisService.getWeekSales();
     }
 }

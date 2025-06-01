@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -81,81 +80,6 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         goodsDTO.setSkus(skuList);
 
         return goodsDTO;
-    }
-
-    /**
-     * 更新库存
-     * 
-     * @param goodsId
-     * @param count
-     * @param skuId
-     * @return
-     */
-    @Transactional
-    @Override
-    public Result updateStock(Long goodsId, Integer count, Long skuId) {
-        // 查询商品当前状态
-        Goods goods = getById(goodsId);
-        GoodSKU goodSKU = goodSKUService.getById(skuId);
-        if (goods == null) {
-            return Result.fail("商品不存在");
-        }
-
-        // 检查库存是否充足
-        if (goodSKU.getStock() < count) {
-            return Result.fail("库存不足");
-        }
-
-        // 更新sku的销量
-        boolean success = goodSKUService.update()
-                .setSql("stock = stock - " + count)
-                .eq("id", skuId)
-                .ge("stock", count)
-                .update();
-
-        if (success) {
-            // 使用乐观锁更新库存
-            boolean success2 = update()
-                    .setSql("stock = stock - " + count)
-                    .eq("id", goodsId)
-                    .ge("stock", count) // 乐观锁条件
-                    .update();
-
-            if (success2) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("goodStock", goods.getStock() - count);
-                map.put("skuStock", goodSKU.getStock() - count);
-                return Result.ok(map);
-            }
-        }
-        return Result.fail("库存不足");
-    }
-
-    @Override
-    public Result updateSold(Long goodsId, Integer count, Long skuId) {
-
-        Goods goods = getById(goodsId);
-        if (goods == null) {
-            return Result.fail("商品不存在");
-        }
-        // 更新sku的销量
-        boolean success = goodSKUService.update()
-                .setSql("sold = sold + " + count)
-                .eq("id", skuId)
-                .update();
-
-        if (success) {
-            // 使用乐观锁更新销量
-            boolean success2 = update()
-                    .setSql("sold = sold + " + count)
-                    .eq("id", goodsId)
-                    .update();
-
-            if (success2) {
-                return Result.ok(goods.getSold() + count);
-            }
-        }
-        return Result.fail("销量不足");
     }
 
     /**

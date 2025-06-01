@@ -8,6 +8,7 @@ import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.CustomExchange;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -68,5 +69,55 @@ public class RabbitMQConfig {
                 .to(seckillExchange())
                 .with(SECKILL_ROUTING_KEY);
 
+    }
+
+    /**
+     * 购物车交换机
+     */
+    @Bean
+    public DirectExchange cartExchange() {
+        return new DirectExchange("cart.exchange");
+    }
+
+    /**
+     * 购物车更新队列
+     */
+    @Bean
+    public Queue cartUpdateQueue() {
+        return QueueBuilder
+                .durable("cart.update.queue")
+                .build();
+    }
+
+    /**
+     * 购物车保存队列
+     */
+    @Bean
+    public Queue cartSaveQueue() {
+        return QueueBuilder
+                .durable("cart.save.queue")
+                .build();
+    }
+
+    /**
+     * 绑定购物车更新队列到交换机
+     */
+    @Bean
+    public Binding cartUpdateBinding(Queue cartUpdateQueue, DirectExchange cartExchange) {
+        return BindingBuilder
+                .bind(cartUpdateQueue)
+                .to(cartExchange)
+                .with("cart.update");
+    }
+
+    /**
+     * 绑定购物车保存队列到交换机
+     */
+    @Bean
+    public Binding cartSaveBinding(Queue cartSaveQueue, DirectExchange cartExchange) {
+        return BindingBuilder
+                .bind(cartSaveQueue)
+                .to(cartExchange)
+                .with("cart.save");
     }
 }
