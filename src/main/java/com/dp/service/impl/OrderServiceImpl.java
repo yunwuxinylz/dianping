@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
-
 import javax.annotation.Resource;
+
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -68,8 +68,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+
     @Resource
     private OrderMapper orderMapper;
+
 
     @Override
     @Transactional
