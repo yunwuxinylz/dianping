@@ -1,5 +1,6 @@
 package com.dp.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -256,5 +257,140 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
             // log.error("获取商品总数失败", e);
             return Result.fail("获取商品总数失败"); // 使用 Result.fail 而不是 Result.error
         }
+    }
+
+    @Override
+    public Result adminGoodsList(String name, Long shopId, Integer status, Integer pageSize, Integer current) {
+        // 构建查询条件
+        Page<Goods> page = this.query()
+                .like(StrUtil.isNotBlank(name), "name", name)
+                .eq(shopId != null, "shop_id", shopId)
+                .eq(status != null, "status", status)
+                .page(new Page<>(current, pageSize));
+
+        // 获取所有店铺ID
+        List<Long> shopIds = page.getRecords().stream()
+                .map(Goods::getShopId)
+                .collect(Collectors.toList());
+
+        // 一次性查询所有店铺信息
+        Map<Long, Shop> shopMap = shopIds.isEmpty()
+                ? new HashMap<>()
+                : shopService.listByIds(shopIds).stream()
+                        .collect(Collectors.toMap(Shop::getId, shop -> shop));
+
+        // 转换为DTO
+        List<GoodsDTO> goodsDTOList = page.getRecords().stream()
+                .map(item -> {
+                    GoodsDTO goodsDTO = BeanUtil.copyProperties(item, GoodsDTO.class);
+                    if (item.getImages() != null) {
+                        goodsDTO.setImages(Arrays.asList(item.getImages().split(",")));
+                    }
+                    // 从Map中获取店铺信息
+                    Shop shop = shopMap.get(item.getShopId());
+                    if (shop != null) {
+                        goodsDTO.setShopName(shop.getName());
+                    }
+                    return goodsDTO;
+                }).collect(Collectors.toList());
+
+        // 构建返回结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", page.getTotal());
+        result.put("list", goodsDTOList);
+        return Result.ok(result);
+    }
+
+    @Override
+    public Result updateGoods(Goods goods) {
+        if (goods.getId() == null) {
+            return Result.fail("商品id不能为空");
+        }
+        // 将 imagesList List 转为字符串存储
+        if (goods.getImagesList() != null && !goods.getImagesList().isEmpty()) {
+            String images = String.join(",", goods.getImagesList());
+            goods.setImages(images);
+        }
+        boolean success = updateById(goods);
+        if (!success) {
+            return Result.fail("更新失败");
+        }
+        return Result.ok();
+    }
+
+    @Override
+    public Result updateGoodsStatus(Long id, Integer status) {
+        if (id == null || status == null) {
+            return Result.fail("参数不能为空");
+        }
+        Goods goods = new Goods();
+        goods.setId(id);
+        goods.setStatus(status);
+        boolean success = updateById(goods);
+        if (!success) {
+            return Result.fail("更新商品状态失败");
+        }
+        return Result.ok();
+    }
+
+    @Override
+    public Result deleteGoods(Long id) {
+        if (id == null) {
+            return Result.fail("商品ID不能为空");
+        }
+
+        // 先查询商品是否存在
+        Goods goods = getById(id);
+        if (goods == null) {
+            return Result.fail("商品不存在");
+        }
+
+        // 执行删除操作
+        boolean success = removeById(id);
+        if (!success) {
+            return Result.fail("删除失败");
+        }
+
+        return Result.ok();
+    }
+
+    @Override
+    public Result addGoods(Goods goods) {
+        // 参数校验
+        if (goods == null) {
+            return Result.fail("商品信息不能为空");
+        }
+        if (goods.getShopId() == null) {
+            return Result.fail("店铺ID不能为空");
+        }
+        if (StrUtil.isBlank(goods.getName())) {
+            return Result.fail("商品名称不能为空");
+        }
+        if (goods.getPrice() == null) {
+            return Result.fail("商品价格不能为空");
+        }
+        if (goods.getOriginalPrice() == null) {
+            goods.setOriginalPrice(goods.getPrice()); // 默认原价等于现价
+        }
+
+        // 处理图片列表
+        if (goods.getImagesList() != null && !goods.getImagesList().isEmpty()) {
+            String images = String.join(",", goods.getImagesList());
+            goods.setImages(images);
+        }
+
+        // 设置默认值
+        goods.setStatus(1); // 默认上架状态
+        goods.setSold(0); // 初始销量为0
+        goods.setCreateTime(LocalDateTime.now());
+        goods.setUpdateTime(LocalDateTime.now());
+
+        // 保存商品
+        boolean success = save(goods);
+        if (!success) {
+            return Result.fail("新增商品失败");
+        }
+
+        return Result.ok(goods.getId());
     }
 }

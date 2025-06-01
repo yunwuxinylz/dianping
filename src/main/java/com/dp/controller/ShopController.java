@@ -151,4 +151,12 @@ public class ShopController {
         return shopService.getShopTypeStats();
     }
 
+    /**
+     * 获取店铺列表
+     * @return 店铺列表
+     */
+    @GetMapping("/list")
+    public Result getShopList() {
+        return shopService.getShopList();
+    }
 }

@@ -1,10 +1,11 @@
 package com.dp.dto;
 
-import lombok.Data;
-
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.dp.entity.GoodSKU;
+
+import lombok.Data;
 
 /**
  * 商品DTO
@@ -13,6 +14,8 @@ import com.dp.entity.GoodSKU;
 public class GoodsDTO {
     private Long id;
     private Long shopId;
+    private String shopName;
+
     private String name;
     private Long price;
     private Long originalPrice;
@@ -20,6 +23,7 @@ public class GoodsDTO {
     private List<String> images;
     private Integer stock;
     private Integer sold;
+    private Integer status; // 商品状态：1-上架，0-下架
+    private LocalDateTime createTime; // 创建时间
     private List<GoodSKU> skus; // SKU列表
-
 }

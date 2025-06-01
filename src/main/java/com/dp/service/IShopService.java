@@ -28,4 +28,5 @@ public interface IShopService extends IService<Shop> {
 
     Result getShopTypeStats();
 
+    Result getShopList(); // 添加获取店铺列表的方法
 }

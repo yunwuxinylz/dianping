@@ -32,4 +32,14 @@ public interface IOrderService extends IService<Order> {
     Result getTodaySales();
 
     Result getWeekSales();
+
+    /**
+     * 分页获取订单列表（支持搜索）
+     */
+    Result getOrderPage(Integer current, Integer size, String keyword, Integer status);
+
+    /**
+     * 更新订单状态
+     */
+    Result updateOrderStatus(Long id, Integer status);
 }

@@ -76,7 +76,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     @Override
     public Result sendCode(String phone, String type) {
-        // 校验手机号
         if (RegexUtils.isPhoneInvalid(phone)) {
             // 不符合，返回错误消息
             return Result.fail("手机号格式错误！");
@@ -131,6 +130,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         // 生成双token
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Boolean isAdmin = user.getIsAdmin();
         String accessToken = jwtUtils.generateAccessToken(userDTO);
         String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
 
@@ -204,9 +204,141 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         Map<String, Object> result = new HashMap<>();
         result.put("accessToken", accessToken);
-        result.put("isAdmin", user.getIsAdmin());
+        result.put("isAdmin", isAdmin);
         return Result.ok(result);
     }
+
+    // 刷新accessToken
+    // @Override
+    // public Result refreshToken(HttpServletRequest request, HttpServletResponse response) {
+    //     // 从Cookie中获取Refresh Token
+    //     Cookie[] cookies = request.getCookies();
+    //     String refreshToken = null;
+    //     if (cookies != null) {
+    //         for (Cookie cookie : cookies) {
+    //             if ("refreshToken".equals(cookie.getName())) {
+    //                 refreshToken = cookie.getValue();
+    //                 break;
+    //             }
+    //         }
+    //     }
+
+    //     if (StrUtil.isBlank(refreshToken)) {
+    //         return Result.fail("未找到刷新令牌");
+    //     }
+
+    //     // 验证Refresh Token
+    //     if (!jwtUtils.validateRefreshToken(refreshToken)) {
+    //         return Result.fail("刷新令牌已过期，请重新登录");
+    //     }
+
+    //     // 从Refresh Token中提取用户ID
+    //     Long userId = jwtUtils.extractUserIdFromRefreshToken(refreshToken);
+
+    //     // 获取用户信息
+    //     User user = getById(userId);
+    //     if (user == null) {
+    //         return Result.fail("用户不存在");
+    //     }
+
+    //     // 验证设备指纹
+    //     String deviceId = request.getHeader("X-Device-ID");
+    //     String userAgent = request.getHeader("User-Agent");
+    //     String currentFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+    //     // 检查此设备是否在已授权设备列表中
+    //     Boolean isKnownDevice = stringRedisTemplate.opsForHash().hasKey("devices:" + userId, currentFingerprint);
+
+    //     if (Boolean.FALSE.equals(isKnownDevice)) {
+    //         // 可选：记录可疑的刷新令牌尝试
+    //         log.warn("未授权设备尝试刷新令牌: userId={}, fingerprint={}", userId, currentFingerprint);
+    //         return Result.fail("设备未授权，请重新登录");
+    //     }
+
+    //     // 生成新的Access Token
+    //     UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+    //     String accessToken = jwtUtils.generateAccessToken(userDTO);
+
+    //     // 返回新的Access Token
+    //     return Result.ok(accessToken);
+    //     // 生成双token
+    //     UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+    //     String accessToken = jwtUtils.generateAccessToken(userDTO);
+    //     String refreshToken = jwtUtils.generateRefreshToken(userDTO.getId());
+
+    //     // 登录时存储多设备指纹
+    //     String deviceId = request.getHeader("X-Device-ID");
+    //     String userAgent = request.getHeader("User-Agent");
+    //     String deviceFingerprint = jwtUtils.generateDeviceFingerprint(deviceId, userAgent, request.getRemoteAddr());
+
+    //     // 创建分布式锁
+    //     String lockKey = "lock:user:devices:" + userDTO.getId();
+    //     RLock lock = redissonClient.getLock(lockKey);
+
+    //     try {
+    //         // 尝试获取锁，最多等待1秒，锁自动释放时间10秒
+    //         boolean locked = lock.tryLock(1, 10, TimeUnit.SECONDS);
+
+    //         if (locked) {
+    //             // 获取设备列表
+    //             String deviceKey = "devices:" + userDTO.getId();
+    //             Map<Object, Object> deviceMap = stringRedisTemplate.opsForHash().entries(deviceKey);
+
+    //             // 检查当前设备是否已经登录
+    //             boolean deviceExists = deviceMap.containsKey(deviceFingerprint);
+    //             LocalDateTime now = LocalDateTime.now();
+
+    //             if (deviceExists) {
+    //                 // 设备已登录，更新时间
+    //                 stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+    //             } else {
+    //                 // 设备不存在，检查是否超过最大设备数(3)
+    //                 if (deviceMap.size() >= 3) {
+    //                     // 找出最早登录的设备
+    //                     String oldestDevice = deviceMap.entrySet().stream()
+    //                             .min((e1, e2) -> ((String) e1.getValue()).compareTo((String) e2.getValue()))
+    //                             .map(e -> (String) e.getKey())
+    //                             .orElse(null);
+
+    //                     if (oldestDevice != null) {
+    //                         log.info("用户[{}]超出最大设备数量限制，移除最早登录设备: {}", userDTO.getId(), oldestDevice);
+    //                         stringRedisTemplate.opsForHash().delete(deviceKey, oldestDevice);
+    //                     }
+    //                 }
+
+    //                 // 添加新设备
+    //                 stringRedisTemplate.opsForHash().put(deviceKey, deviceFingerprint, now.toString());
+    //             }
+
+    //             // 设置过期时间
+    //             stringRedisTemplate.expire(deviceKey, JwtUtils.REFRESH_TOKEN_EXPIRATION, TimeUnit.MILLISECONDS);
+    //         } else {
+    //             log.warn("用户[{}]登录时锁获取超时", userDTO.getId());
+    //         }
+    //     } catch (InterruptedException e) {
+    //         Thread.currentThread().interrupt();
+    //         log.error("获取锁过程被中断", e);
+    //     } finally {
+    //         // 释放锁，只有持有锁的线程才能释放
+    //         if (lock.isHeldByCurrentThread()) {
+    //             lock.unlock();
+    //         }
+    //     }
+
+    //     // 创建HttpOnly Cookie存储Refresh Token
+    //     Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+    //     refreshTokenCookie.setHttpOnly(true);
+    //     refreshTokenCookie.setSecure(true); // 仅HTTPS
+    //     refreshTokenCookie.setPath("/api/user/refresh-token");
+    //     refreshTokenCookie.setMaxAge((int) (JwtUtils.REFRESH_TOKEN_EXPIRATION / 1000));
+
+    //     response.addCookie(refreshTokenCookie);
+
+    //     Map<String, Object> result = new HashMap<>();
+    //     result.put("accessToken", accessToken);
+    //     result.put("isAdmin", user.getIsAdmin());
+    //     return Result.ok(result);
+    // }
 
     // 刷新accessToken
     @Override
@@ -420,7 +552,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         user.setUpdateTime(now);
         
         // 6.设置管理员标识
-        String adminValue = user.getIsAdmin() != null ? user.getIsAdmin().toString() : "0";
+        Boolean adminValue = user.getIsAdmin() != null ? user.getIsAdmin() : false;
         user.setIsAdmin(adminValue);
         // 7.保存用户
         save(user);

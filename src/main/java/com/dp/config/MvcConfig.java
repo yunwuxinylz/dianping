@@ -29,6 +29,7 @@ public class MvcConfig implements WebMvcConfigurer {
                                                 "/shop/**",
                                                 "/voucher/**",
                                                 "/upload/**",
+                                                "/after-sale/**",
                                                 "/blog/hot",
                                                 "/user/code",
                                                 "/user/login",
