@@ -18,7 +18,9 @@ import com.dp.dto.OrderCancelDTO;
 import com.dp.dto.OrderCreateDTO;
 import com.dp.dto.OrderDTO;
 import com.dp.dto.OrderQueryDTO;
+import com.dp.dto.OrderStatusDTO;
 import com.dp.dto.Result;
+import com.dp.enums.OrderStatus;
 import com.dp.service.IOrderService;
 
 // 订单Controller
@@ -46,19 +48,10 @@ public class OrderController {
 
     /**
      * 支付订单
-     * 
-     * @param orderId
-     * @param payType
-     * @return
      */
-    @PutMapping("/pay/{orderId}")
-    public Result payOrder(@PathVariable Long orderId, @RequestParam Integer payType) {
-        // 支付订单
-        boolean success = orderService.payOrder(orderId, payType);
-        if (!success) {
-            return Result.fail("支付失败");
-        }
-        return Result.ok();
+    @PutMapping("/pay/{id}")
+    public Result payOrder(@PathVariable Long id) {
+        return orderService.updateOrderStatus(id, OrderStatus.PAID.getValue());
     }
 
     /**
@@ -132,25 +125,11 @@ public class OrderController {
     }
 
     /**
-     * 发货
-     * 
-     * @param orderId
-     * @return
+     * 商家发货
      */
-    @PutMapping("/confirm/{orderId}")
-    public Result deliveryOrder(@PathVariable Long orderId) {
-        return orderService.confirmOrder(orderId);
-    }
-
-    /**
-     * 确认收货
-     * 
-     * @param orderId
-     * @return
-     */
-    @PutMapping("/delivery/{orderId}")
-    public Result confirmOrder(@PathVariable Long orderId) {
-        return orderService.deliveryOrder(orderId);
+    @PutMapping("/ship/{id}")
+    public Result shipOrder(@PathVariable Long id) {
+        return orderService.updateOrderStatus(id, OrderStatus.SHIPPED.getValue());
     }
 
     /**
@@ -161,6 +140,72 @@ public class OrderController {
     @GetMapping("/statistics")
     public Result getOrderStatistics() {
         return orderService.getOrderStatistics();
+    }
+
+    /**
+     * 获取订单总数
+     * 
+     * @return 订单总数
+     */
+    @GetMapping("/count")
+    public Result getOrderCount() {
+        return orderService.getOrderCount();
+    }
+
+    /**
+     * 获取今日销售额
+     * 
+     * @return 今日销售额
+     */
+    @GetMapping("/today-sales")
+    public Result getTodaySales() {
+        return orderService.getTodaySales();
+    }
+
+    /**
+     * 获取最近7天销售趋势
+     * 
+     * @return 最近7天销售趋势数据
+     */
+    @GetMapping("/week-sales")
+    public Result getWeekSales() {
+        return orderService.getWeekSales();
+    }
+
+    /**
+     * 分页获取订单列表（支持搜索）
+     */
+    @GetMapping("/page")
+    public Result getOrderPage(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        return orderService.getOrderPage(page, size, keyword, status);
+    }
+
+    /**
+     * 确认收货
+     */
+    @PutMapping("/delivery/{id}")
+    public Result deliveryOrder(@PathVariable("id") Long id) {
+        if (id == null) {
+            return Result.fail("订单ID不能为空");
+        }
+        // 将订单状态改为已完成(5)
+        return orderService.updateOrderStatus(id, OrderStatus.COMPLETED.getValue());
+    }
+
+    /**
+     * 更新订单状态
+     */
+    @PutMapping("/update/status/{id}")
+    public Result updateOrderStatus(@PathVariable("id") Long id, @RequestBody OrderStatusDTO statusDTO) {
+        if (id == null) {
+            return Result.fail("订单ID不能为空");
+        }
+        // 更新订单状态
+        return orderService.updateOrderStatus(id, statusDTO.getStatus());
     }
 
     /**

@@ -6,6 +6,7 @@ import static com.dp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.dp.utils.RedisConstants.LOCK_SHOP_KEY;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -253,5 +254,22 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             log.error("获取商铺类型统计数据失败", e);
             return Result.fail("获取商铺类型统计数据失败");
         }
+    }
+
+
+    @Override
+    public Result getShopList() {
+        // 查询所有店铺
+        List<Shop> shops = list();
+        // 转换为前端需要的格式
+        List<Map<String, Object>> result = shops.stream()
+                .map(shop -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", shop.getId());
+                    map.put("name", shop.getName());
+                    return map;
+                })
+                .collect(Collectors.toList());
+        return Result.ok(result);
     }
 }

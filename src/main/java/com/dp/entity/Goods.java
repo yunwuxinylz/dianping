@@ -3,12 +3,14 @@ package com.dp.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 // 商品实体类
 @Data
@@ -32,6 +34,9 @@ public class Goods implements Serializable {
     private String description;
 
     private String images;
+
+    @TableField(exist = false)
+    private List<String> imagesList;
 
     private Integer stock;
 

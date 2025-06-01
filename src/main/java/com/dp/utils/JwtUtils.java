@@ -24,7 +24,7 @@ public class JwtUtils {
     private final static SecretKey REFRESH_TOKEN_SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
     // Access Token有效期: 15分钟
-    public static final long ACCESS_TOKEN_EXPIRATION = 10 * 1000;
+    public static final long ACCESS_TOKEN_EXPIRATION = 15 * 60 * 1000; // 15分钟
 
     // Refresh Token有效期: 15天
     public static final long REFRESH_TOKEN_EXPIRATION = 15 * 24 * 60 * 60 * 1000;
@@ -35,6 +35,7 @@ public class JwtUtils {
         claims.put("id", userDTO.getId());
         claims.put("nickName", userDTO.getNickName());
         claims.put("icon", userDTO.getIcon());
+        claims.put("isAdmin", userDTO.getIsAdmin());
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -67,6 +68,7 @@ public class JwtUtils {
         userDTO.setId(Long.valueOf(claims.getSubject()));
         userDTO.setNickName((String) claims.get("nickName"));
         userDTO.setIcon((String) claims.get("icon"));
+        userDTO.setIsAdmin((Boolean) claims.get("isAdmin"));
         return userDTO;
     }
 

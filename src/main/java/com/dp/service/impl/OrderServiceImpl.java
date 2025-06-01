@@ -37,6 +37,7 @@ import com.dp.dto.Result;
 import com.dp.dto.UserDTO;
 import com.dp.entity.Order;
 import com.dp.entity.OrderItems;
+import com.dp.enums.OrderStatus;
 import com.dp.mapper.OrderMapper;
 import com.dp.service.IGoodsService;
 import com.dp.service.IOrderItemsService;
@@ -45,6 +46,7 @@ import com.dp.utils.RedisConstants;
 import com.dp.utils.UserHolder;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -531,25 +533,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             // 获取今天的开始时间和结束时间
             LocalDateTime today = LocalDate.now().atStartOfDay();
             LocalDateTime tomorrow = today.plusDays(1);
-            
+
             // 查询今日已支付订单的销售额总和
             // 只统计状态为已支付(2)、待收货(4)和已完成(5)的订单
             Long todaySales = lambdaQuery()
-                .ge(Order::getCreateTime, today)
-                .lt(Order::getCreateTime, tomorrow)
-                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
-                .list()
-                .stream()
-                .mapToLong(Order::getAmount)
-                .sum();
-            
+                    .ge(Order::getCreateTime, today)
+                    .lt(Order::getCreateTime, tomorrow)
+                    .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                    .list()
+                    .stream()
+                    .mapToLong(Order::getAmount)
+                    .sum();
             return Result.ok(todaySales);
         } catch (Exception e) {
             log.error("获取今日销售额失败", e);
             return Result.fail("获取今日销售额失败");
         }
     }
-    
+
     @Override
     public Result getWeekSales() {
         try {
@@ -558,24 +559,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             LocalDate sevenDaysAgo = today.minusDays(6); // 包括今天在内的7天
             LocalDateTime startTime = sevenDaysAgo.atStartOfDay();
             LocalDateTime endTime = today.plusDays(1).atStartOfDay(); // 今天结束时间
-            
+
             // 查询最近7天的订单
             List<Order> orders = lambdaQuery()
-                .ge(Order::getCreateTime, startTime)
-                .lt(Order::getCreateTime, endTime)
-                .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
-                .list();
-            
+                    .ge(Order::getCreateTime, startTime)
+                    .lt(Order::getCreateTime, endTime)
+                    .in(Order::getStatus, Arrays.asList(2, 4, 5)) // 已支付、待收货、已完成的订单
+                    .list();
+
             // 按日期分组计算每天的销售额
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             Map<String, Long> dailySales = new TreeMap<>(); // 使用TreeMap保持日期顺序
-            
+          
             // 初始化最近7天的每一天
             for (int i = 6; i >= 0; i--) {
                 String dayStr = today.minusDays(i).format(formatter);
                 dailySales.put(dayStr, 0L);
             }
-            
+
             // 填充每日销售数据
             orders.forEach(order -> {
                 String dayStr = order.getCreateTime().toLocalDate().format(formatter);
@@ -583,21 +584,172 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     dailySales.compute(dayStr, (k, v) -> v + order.getAmount());
                 }
             });
-            
+
+
             // 转换为前端需要的数据格式
             List<Map<String, Object>> result = dailySales.entrySet().stream()
-                .map(entry -> {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("date", entry.getKey());
-                    item.put("sales", entry.getValue());
-                    return item;
-                })
-                .collect(Collectors.toList());
-            
+                    .map(entry -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("date", entry.getKey());
+                        item.put("sales", entry.getValue());
+                        return item;
+                    })
+                    .collect(Collectors.toList());
+          
             return Result.ok(result);
         } catch (Exception e) {
             log.error("获取最近7天销售趋势失败", e);
             return Result.fail("获取最近7天销售趋势失败");
         }
+    }
+
+    @Override
+    public Result getOrderPage(Integer current, Integer size, String keyword, Integer status) {
+        try {
+            // 1. 创建分页对象
+            Page<Order> pageParam = new Page<>(current, size);
+
+            // 2. 构建查询条件
+            LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+
+            // 3. 关键字搜索
+            if (StrUtil.isNotBlank(keyword)) {
+                wrapper.and(w -> w
+                        .like(Order::getId, keyword)
+                        .or()
+                        .like(Order::getAddressName, keyword)
+                        .or()
+                        .like(Order::getAddressPhone, keyword));
+            }
+
+            // 4. 状态筛选
+            if (status != null) {
+                wrapper.eq(Order::getStatus, status);
+            }
+
+            // 5. 排序
+            wrapper.orderByDesc(Order::getCreateTime);
+
+            // 6. 执行查询
+            Page<Order> orderPage = page(pageParam, wrapper);
+
+            // 7. 获取订单列表
+            List<Order> records = orderPage.getRecords();
+
+            // 8. 转换订单状态描述（使用枚举）
+            List<Map<String, Object>> resultList = records.stream().map(order -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", order.getId());
+                map.put("userId", order.getUserId());
+                map.put("addressName", order.getAddressName());
+                map.put("addressPhone", order.getAddressPhone());
+                map.put("addressDetail", order.getAddressDetail());
+                map.put("amount", order.getAmount());
+                map.put("status", order.getStatus());
+                map.put("statusDesc", OrderStatus.getDescByValue(order.getStatus()));
+                map.put("createTime", order.getCreateTime());
+                map.put("payTime", order.getPayTime());
+                map.put("remark", order.getRemark());
+                map.put("shopName", order.getShopName());
+                map.put("count", order.getCount());
+                return map;
+            }).collect(Collectors.toList());
+
+            // 9. 构建返回结果
+            Map<String, Object> result = new HashMap<>();
+            result.put("records", resultList);
+            result.put("total", orderPage.getTotal());
+            result.put("size", orderPage.getSize());
+            result.put("current", orderPage.getCurrent());
+
+            return Result.ok(result);
+
+        } catch (Exception e) {
+            log.error("获取订单列表失败", e);
+            return Result.fail("获取订单列表失败");
+        }
+    }
+
+    @Override
+    @Transactional
+    public Result updateOrderStatus(Long id, Integer status) {
+        // 1. 参数校验
+        if (id == null || status == null) {
+            return Result.fail("参数错误");
+        }
+
+        // 2. 查询订单
+        Order order = getById(id);
+        if (order == null) {
+            return Result.fail("订单不存在");
+        }
+
+        // 3. 状态流转校验
+        if (!isValidStatusTransition(order.getStatus(), status)) {
+            return Result.fail("订单状态流转异常");
+        }
+
+        // 4. 更新状态
+        Order updateOrder = new Order();
+        updateOrder.setId(id);
+        updateOrder.setStatus(status);
+        updateOrder.setUpdateTime(LocalDateTime.now());
+
+        // 5. 根据不同状态设置不同字段
+        if (status.equals(OrderStatus.PAID.getValue())) {
+            // 支付时设置支付时间
+            updateOrder.setPayTime(LocalDateTime.now());
+        } else if (status.equals(OrderStatus.SHIPPED.getValue())) {
+            // 发货时设置发货时间（如果有这个字段）
+            updateOrder.setUpdateTime(LocalDateTime.now());
+        } else if (status.equals(OrderStatus.COMPLETED.getValue())) {
+            // 确认收货时可以设置完成时间（如果有这个字段）
+            updateOrder.setUpdateTime(LocalDateTime.now());
+        }
+
+        // 6. 执行更新
+        boolean success = updateById(updateOrder);
+        if (!success) {
+            return Result.fail("更新订单状态失败");
+        }
+
+        // 7. 记录日志
+        log.info("订单{}状态更新为{}", id, status);
+
+        return Result.ok();
+    }
+
+    /**
+     * 校验订单状态流转是否合法
+     * 
+     * @param currentStatus 当前状态
+     * @param targetStatus  目标状态
+     * @return 是否合法
+     */
+    private boolean isValidStatusTransition(Integer currentStatus, Integer targetStatus) {
+        // 定义状态流转规则
+        if (currentStatus == null || targetStatus == null) {
+            return false;
+        }
+
+        // 未支付 -> 已支付、已取消
+        if (currentStatus.equals(OrderStatus.UNPAID.getValue())) {
+            return targetStatus.equals(OrderStatus.PAID.getValue())
+                    || targetStatus.equals(OrderStatus.CANCELLED.getValue());
+        }
+
+        // 已支付 -> 已发货、已取消
+        if (currentStatus.equals(OrderStatus.PAID.getValue())) {
+            return targetStatus.equals(OrderStatus.SHIPPED.getValue())
+                    || targetStatus.equals(OrderStatus.CANCELLED.getValue());
+        }
+
+        // 已发货 -> 已完成
+        if (currentStatus.equals(OrderStatus.SHIPPED.getValue())) {
+            return targetStatus.equals(OrderStatus.COMPLETED.getValue());
+        }
+
+        // 其他状态不允许变更
+        return false;
     }
 }

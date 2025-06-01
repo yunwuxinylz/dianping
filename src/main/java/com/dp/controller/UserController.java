@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import com.dp.dto.LoginFormDTO;
 import com.dp.dto.RegisterFormDTO;
@@ -171,8 +174,45 @@ public class UserController {
         return userService.updateUser(user);
     }
 
-    // @GetMapping("/count")
-    // public Result getCount() {
-    //     return userService.getCount();
-    // }
+    /**
+     * 后台管理系统更新用户信息
+     */
+    @PutMapping("/admin/update")
+    public Result adminUpdate(@RequestBody User user) {
+        return userService.adminUpdateUser(user);
+    }
+
+    // 获取用户数量
+    @GetMapping("/count")
+    public Result getCount() {
+        return userService.getCount();
+    }
+
+    // 获取用户列表
+    @GetMapping("/list")
+    public Result getUserList(
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "query", required = false) String query) {
+        return userService.getUserList(page, size, query);
+    }
+
+    /**
+     * 删除用户
+     * @param id 用户ID
+     * @return 删除结果
+     */
+    @DeleteMapping("/delete/{id}")
+    public Result deleteUser(@PathVariable("id") Long id) {
+        return userService.deleteUser(id);
+    }
+
+    /**
+     * 创建新用户
+     * @param user 用户信息，包含用户名、手机号、密码、角色
+     */
+    @PostMapping("/create")
+    public Result createUser(@RequestBody User user) {
+        return userService.createUser(user);
+    }
 }
