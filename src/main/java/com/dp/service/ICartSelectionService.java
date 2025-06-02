@@ -3,7 +3,7 @@ package com.dp.service;
 import com.dp.dto.Result;
 
 public interface ICartSelectionService {
-    Result checkCartItem(Long userId, Long goodsId, Long skuId, Boolean checked);
+    Result checkCartItem(Long userId, Long shopId, Long goodsId, Long skuId, Boolean checked);
 
     Result checkAllItems(Long userId, Boolean checked);
 

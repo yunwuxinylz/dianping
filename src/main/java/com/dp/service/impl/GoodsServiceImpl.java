@@ -51,7 +51,9 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper, Goods> implements
         // 转换为DTO
         return goodsList.stream().map(goods -> {
             GoodsDTO goodsDTO = BeanUtil.copyProperties(goods, GoodsDTO.class);
-            goodsDTO.setImages(Arrays.asList(goods.getImages().split(",")));
+            if (goods.getImages() != null) {
+                goodsDTO.setImages(Arrays.asList(goods.getImages().split(",")));
+            }
             return goodsDTO;
         }).collect(Collectors.toList());
     }

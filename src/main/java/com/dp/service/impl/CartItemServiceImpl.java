@@ -1,30 +1,29 @@
 package com.dp.service.impl;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.dp.dto.CartAddDTO;
 import com.dp.dto.CartItemDTO;
 import com.dp.dto.Result;
 import com.dp.dto.ShopCartDTO;
-import com.dp.entity.GoodSKU;
 import com.dp.entity.Goods;
-import com.dp.entity.Shop;
-import com.dp.service.ICartItemService;
 import com.dp.service.ICartCacheService;
-import com.dp.service.IGoodSKUService;
+import com.dp.service.ICartItemService;
 import com.dp.service.IGoodsService;
-import com.dp.service.IShopService;
 import com.dp.utils.StockUtils;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.DigestUtil;
+import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -35,8 +34,6 @@ import lombok.extern.slf4j.Slf4j;
 public class CartItemServiceImpl implements ICartItemService {
 
     private final IGoodsService goodsService;
-    private final IGoodSKUService goodSkuService;
-    private final IShopService shopService;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
     private final StockUtils stockUtils;
@@ -49,15 +46,11 @@ public class CartItemServiceImpl implements ICartItemService {
     private static final long LOCK_LEASE_SECONDS = 3;
 
     public CartItemServiceImpl(IGoodsService goodsService,
-            IGoodSKUService goodSkuService,
-            IShopService shopService,
             StringRedisTemplate stringRedisTemplate,
             RedissonClient redissonClient,
             StockUtils stockUtils,
             ICartCacheService cartCacheService) {
         this.goodsService = goodsService;
-        this.goodSkuService = goodSkuService;
-        this.shopService = shopService;
         this.stringRedisTemplate = stringRedisTemplate;
         this.redissonClient = redissonClient;
         this.stockUtils = stockUtils;
@@ -84,19 +77,21 @@ public class CartItemServiceImpl implements ICartItemService {
      * 添加商品到购物车
      */
     @Override
-    public Result addToCart(Long userId, CartItemDTO cartItem) {
-        Long goodsId = cartItem.getGoodsId();
-        Long skuId = cartItem.getSkuId();
-        Integer count = cartItem.getCount();
+    public Result addToCart(Long userId, CartAddDTO cartAddDTO) {
+        Long shopId = cartAddDTO.getShopId();
+        Long goodsId = cartAddDTO.getGoodsId();
+        Long skuId = cartAddDTO.getSkuId();
+        Integer count = cartAddDTO.getCount();
+        Boolean checked = cartAddDTO.getChecked();
 
         // 参数校验
-        if (userId == null || cartItem == null || goodsId == null || count == null) {
+        if (userId == null || cartAddDTO == null || goodsId == null || count == null) {
             return Result.fail("参数错误");
         }
 
         // 生成请求标识
-        String requestId = generateRequestId(userId, "addToCart", goodsId,
-                skuId, count, cartItem.getChecked());
+        String requestId = generateRequestId(userId, "addToCart", shopId, goodsId,
+                skuId, count, checked);
 
         // 创建分布式锁
         RLock lock = redissonClient.getLock(IDEMPOTENT_KEY_PREFIX + requestId);
@@ -108,40 +103,69 @@ public class CartItemServiceImpl implements ICartItemService {
                 return Result.fail("请求处理中");
             }
 
-            // 检查库存
-            Goods goods = goodsService.getById(goodsId);
+            Goods goods = goodsService.getOne(new LambdaQueryWrapper<Goods>()
+                    .eq(Goods::getId, goodsId)
+                    .eq(Goods::getStatus, 1));
             if (goods == null) {
-                return Result.fail("商品不存在");
-            }
-
-            // 检查库存
-            if (!stockUtils.hasEnoughStock(goodsId, skuId, count)) {
-                return Result.fail("库存不足");
+                return Result.fail("商品不存在或已下架");
             }
 
             // 从Redis获取购物车并更新
             String cartKey = CART_KEY_PREFIX + userId;
 
-            // 获取购物车数据(使用Hash结构)
-            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
-            List<ShopCartDTO> cartList;
+            // 获取购物车数据(使用shopId作为key)
+            Object shopCartJson = stringRedisTemplate.opsForHash().get(cartKey, shopId.toString());
 
-            if (entries.isEmpty()) {
-                // 从数据库加载购物车
-                cartList = cartCacheService.loadCartFromDB(userId);
+            ShopCartDTO shopCart = new ShopCartDTO();
+
+            if (shopCartJson == null) {
+                // 检查库存
+                if (!stockUtils.hasEnoughStock(goodsId, skuId, count)) {
+                    return Result.fail("库存不足");
+                }
+                // 创建新的购物车
+                shopCart.setShopId(shopId);
+                shopCart.setShopName(cartAddDTO.getShopName());
+                shopCart.setItems(new ArrayList<>());
+                // 将CartAddDTO转换为CartItemDTO
+                CartItemDTO cartItem = BeanUtil.toBean(cartAddDTO, CartItemDTO.class);
+
+                shopCart.getItems().add(cartItem);
             } else {
-                cartList = cartCacheService.convertHashToCartList(entries);
+                shopCart = JSONUtil.toBean(shopCartJson.toString(), ShopCartDTO.class);
+
+                boolean isExist = false;
+                // 更新购物车项
+                for (CartItemDTO item : shopCart.getItems()) {
+                    if (item.getGoodsId().equals(goodsId) &&
+                            ((skuId == null && item.getSkuId() == null) ||
+                                    (skuId != null && skuId.equals(item.getSkuId())))) {
+                        // 更新数量
+                        int newCount = item.getCount() + count;
+                        if (!stockUtils.hasEnoughStock(goodsId, skuId, newCount)) {
+                            return Result.fail("库存不足");
+                        }
+                        item.setCount(newCount);
+                        item.setChecked(checked);
+                        isExist = true;
+                        break;
+                    }
+                }
+                if (!isExist) {
+                    // 检查库存
+                    if (!stockUtils.hasEnoughStock(goodsId, skuId, count)) {
+                        return Result.fail("库存不足");
+                    }
+                    // 创建新的购物车项
+                    CartItemDTO cartItem = BeanUtil.toBean(cartAddDTO, CartItemDTO.class);
+                    shopCart.getItems().add(cartItem);
+                }
+
             }
-
-            // 处理添加商品逻辑
-            boolean success = updateCartWithNewItem(cartList, goods, cartItem);
-
-            if (!success) {
-                return Result.fail("库存不足");
-            }
-
             // 更新Redis缓存
-            cartCacheService.updateCartCache(userId, cartList);
+            stringRedisTemplate.opsForHash().put(cartKey, shopId.toString(), JSONUtil.toJsonStr(shopCart));
+            // 过期时间
+            stringRedisTemplate.expire(cartKey, 7, TimeUnit.DAYS);
 
             // 异步更新数据库
             cartCacheService.sendCartUpdateMessage(userId);
@@ -160,86 +184,77 @@ public class CartItemServiceImpl implements ICartItemService {
     }
 
     /**
-     * 更新购物车
+     * 合并购物车
      */
     @Override
-    public Boolean updateCartWithNewItem(List<ShopCartDTO> cartList, Goods goods, CartItemDTO cartItem) {
-        Long shopId = goods.getShopId();
+    public Result mergeCart(Long userId, List<ShopCartDTO> guestCart) {
+        log.info("用户[{}]开始合并购物车，游客购物车项数: {}", userId, guestCart.size());
 
-        // 查找商铺购物车
-        ShopCartDTO shopCart = cartList.stream()
-                .filter(sc -> sc.getShopId().equals(shopId))
-                .findFirst().orElse(null);
-
-        if (shopCart == null) {
-            Shop shop = shopService.getById(shopId);
-            // 创建新的商铺购物车
-            shopCart = new ShopCartDTO();
-            shopCart.setShopId(shopId);
-            shopCart.setShopName(shop.getName());
-            if (shop.getImages() != null) {
-                List<String> imageList = Arrays.asList(shop.getImages().split(","));
-                shopCart.setShopImage(imageList);
-            }
-            shopCart.setItems(new ArrayList<>());
-            cartList.add(shopCart);
-        } else {
-            // 查找是否已存在相同商品
-            CartItemDTO existItem = shopCart.getItems().stream()
-                    .filter(item -> item.getGoodsId().equals(cartItem.getGoodsId()) &&
-                            (cartItem.getSkuId() == null ? item.getSkuId() == null
-                                    : cartItem.getSkuId().equals(item.getSkuId())))
-                    .findFirst().orElse(null);
-
-            if (existItem != null) {
-                Integer newCount = existItem.getCount() + cartItem.getCount();
-                if (!stockUtils.hasEnoughStock(existItem.getGoodsId(), existItem.getSkuId(), newCount)) {
-                    return false;
-                }
-                // 已存在则增加数量
-                existItem.setCount(newCount);
-                existItem.setChecked(cartItem.getChecked());
-                return true;
-            }
+        // 如果游客购物车为空，直接返回成功
+        if (guestCart == null || guestCart.isEmpty()) {
+            return Result.ok("购物车已同步");
         }
 
-        // 不存在则添加新商品
-        CartItemDTO newItem = new CartItemDTO();
-        newItem.setGoodsId(cartItem.getGoodsId());
-        newItem.setSkuId(cartItem.getSkuId());
-        newItem.setCount(cartItem.getCount());
-        newItem.setChecked(cartItem.getChecked());
+        // 统计合并结果
+        AtomicInteger mergedCount = new AtomicInteger(0);
+        AtomicInteger errorCount = new AtomicInteger(0);
 
-        // 设置商品信息
-        newItem.setGoodsName(goods.getName());
-        newItem.setGoodsImages(goods.getImages());
-        newItem.setPrice(goods.getPrice());
-
-        // 设置SKU信息
-        if (cartItem.getSkuId() != null) {
-            GoodSKU sku = goodSkuService.getById(cartItem.getSkuId());
-            if (sku != null) {
-                newItem.setSkuName(sku.getName());
-                if (sku.getPrice() != null && sku.getPrice() > 0) {
-                    newItem.setPrice(sku.getPrice());
+        try {
+            // 逐一将游客购物车项添加到用户购物车
+            for (ShopCartDTO shopCart : guestCart) {
+                List<CartItemDTO> cartItems = shopCart.getItems();
+                if (cartItems == null || cartItems.isEmpty()) {
+                    continue;
+                }
+                for (CartItemDTO item : cartItems) {
+                    try {
+                        CartAddDTO cartAddDTO = new CartAddDTO();
+                        cartAddDTO = BeanUtil.toBean(item, CartAddDTO.class);
+                        cartAddDTO.setShopId(shopCart.getShopId());
+                        cartAddDTO.setShopName(shopCart.getShopName());
+                        Result res = addToCart(userId, cartAddDTO);
+                        if (res.getSuccess()) {
+                            mergedCount.incrementAndGet();
+                        } else {
+                            errorCount.incrementAndGet();
+                            log.warn("添加购物车项失败: 用户ID={}, 商品ID={}, SKU={}, 错误: {}",
+                                    userId, item.getGoodsId(), item.getSkuId(), res.getErrorMsg());
+                        }
+                    } catch (Exception e) {
+                        errorCount.incrementAndGet();
+                        log.error("添加购物车项异常: 用户ID={}, 商品ID={}, SKU={}",
+                                userId, item.getGoodsId(), item.getSkuId(), e);
+                    }
                 }
             }
-        }
 
-        shopCart.getItems().add(newItem);
-        return true;
+            // 生成结果消息
+            String message;
+            if (errorCount.get() > 0) {
+                message = String.format("购物车已同步，%d件商品同步成功，%d件同步失败",
+                        mergedCount.get(), errorCount.get());
+            } else {
+                message = String.format("购物车已同步，共%d件商品", mergedCount.get());
+            }
+
+            // 返回合并结果
+            return Result.ok(message);
+        } catch (Exception e) {
+            log.error("合并购物车失败: 用户ID={}", userId, e);
+            return Result.fail("购物车同步失败，请重试");
+        }
     }
 
     /**
      * 更新购物车商品数量
      */
     @Override
-    public Result updateCartItemCount(Long userId, Long goodsId, Long skuId, Integer count) {
-        if (userId == null || goodsId == null || count == null || count < 1) {
+    public Result updateCartItemCount(Long userId, Long shopId, Long goodsId, Long skuId, Integer count) {
+        if (userId == null || shopId == null || goodsId == null || skuId == null || count == null || count < 1) {
             return Result.fail("参数错误");
         }
 
-        String requestId = generateRequestId(userId, "updateCartItemCount", goodsId, skuId, count);
+        String requestId = generateRequestId(userId, "updateCartItemCount", shopId, goodsId, skuId, count);
         RLock lock = redissonClient.getLock(IDEMPOTENT_KEY_PREFIX + requestId);
 
         try {
@@ -255,33 +270,29 @@ public class CartItemServiceImpl implements ICartItemService {
 
             // 从Redis获取购物车
             String cartKey = CART_KEY_PREFIX + userId;
-            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
-            List<ShopCartDTO> cartList;
+            Object shopCartJson = stringRedisTemplate.opsForHash().get(cartKey, shopId.toString());
 
-            if (entries.isEmpty()) {
-                // 从数据库加载购物车
-                cartList = cartCacheService.loadCartFromDB(userId);
-                if (cartList.isEmpty()) {
-                    return Result.fail("购物车为空");
-                }
+            ShopCartDTO shopCartDTO = new ShopCartDTO();
+
+            if (shopCartJson == null) {
+                return Result.fail("请刷新购物车");
             } else {
-                cartList = cartCacheService.convertHashToCartList(entries);
+                shopCartDTO = JSONUtil.toBean(shopCartJson.toString(), ShopCartDTO.class);
             }
 
-            for (ShopCartDTO shopCart : cartList) {
-                for (CartItemDTO item : shopCart.getItems()) {
-                    if (item.getGoodsId().equals(goodsId) &&
-                            ((skuId == null && item.getSkuId() == null) ||
-                                    (skuId != null && skuId.equals(item.getSkuId())))) {
-                        item.setCount(count);
-                        // 更新Redis缓存
-                        cartCacheService.updateCartCache(userId, cartList);
+            for (CartItemDTO item : shopCartDTO.getItems()) {
+                if (item.getGoodsId().equals(goodsId) &&
+                        ((skuId == null && item.getSkuId() == null) ||
+                                (skuId != null && skuId.equals(item.getSkuId())))) {
+                    item.setCount(count);
+                    // 更新Redis缓存
+                    stringRedisTemplate.opsForHash().put(cartKey, shopId.toString(), JSONUtil.toJsonStr(shopCartDTO));
+                    // 过期时间
+                    stringRedisTemplate.expire(cartKey, 7, TimeUnit.DAYS);
+                    // 异步更新数据库
+                    cartCacheService.sendCartUpdateMessage(userId);
 
-                        // 异步更新数据库
-                        cartCacheService.sendCartUpdateMessage(userId);
-
-                        return Result.ok("更新完成");
-                    }
+                    return Result.ok("更新完成");
                 }
             }
 
@@ -301,9 +312,9 @@ public class CartItemServiceImpl implements ICartItemService {
      * 移除购物车商品
      */
     @Override
-    public Result removeFromCart(Long userId, Long goodsId, Long skuId) {
+    public Result removeFromCart(Long userId, Long shopId, Long goodsId, Long skuId) {
         // 生成请求标识
-        String requestId = generateRequestId(userId, "removeFromCart", goodsId, skuId);
+        String requestId = generateRequestId(userId, "removeFromCart", shopId, goodsId, skuId);
         RLock lock = redissonClient.getLock(IDEMPOTENT_KEY_PREFIX + requestId);
 
         try {
@@ -312,55 +323,45 @@ public class CartItemServiceImpl implements ICartItemService {
                 return Result.fail("请求正在处理中，请稍后再试");
             }
 
+            String shopIdStr = shopId.toString();
             // 从Redis获取购物车(使用Hash结构)
             String cartKey = CART_KEY_PREFIX + userId;
-            Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
-            List<ShopCartDTO> cartList;
+            Object shopCartJson = stringRedisTemplate.opsForHash().get(cartKey, shopIdStr);
+            ShopCartDTO shopCart;
 
-            if (entries.isEmpty()) {
-                // 从数据库加载购物车
-                cartList = cartCacheService.loadCartFromDB(userId);
-                if (cartList.isEmpty()) {
-                    return Result.fail("购物车为空");
-                }
+            if (shopCartJson == null) {
+                return Result.fail("请刷新购物车");
             } else {
-                cartList = cartCacheService.convertHashToCartList(entries);
+                shopCart = JSONUtil.toBean(shopCartJson.toString(), ShopCartDTO.class);
             }
 
+            List<CartItemDTO> cartItems = shopCart.getItems();
             // 查找并移除购物车项
-            boolean found = false;
-            for (ShopCartDTO shopCart : cartList) {
-                List<CartItemDTO> items = shopCart.getItems();
-                for (CartItemDTO item : items) {
-                    if (item.getGoodsId().equals(goodsId) &&
-                            ((skuId == null && item.getSkuId() == null) ||
-                                    (skuId != null && skuId.equals(item.getSkuId())))) {
-                        items.remove(item);
-                        found = true;
-                        break;
+            for (CartItemDTO item : cartItems) {
+                if (item.getGoodsId().equals(goodsId) &&
+                        ((skuId == null && item.getSkuId() == null) ||
+                                (skuId != null && skuId.equals(item.getSkuId())))) {
+                    cartItems.remove(item);
+                    if (cartItems.isEmpty()) {
+                        stringRedisTemplate.opsForHash().delete(cartKey, shopIdStr);
+                    } else {
+                        stringRedisTemplate.opsForHash().put(cartKey, shopIdStr, JSONUtil.toJsonStr(shopCart));
                     }
-                }
-                if (found) {
-                    break;
+
+                    // 过期时间
+                    stringRedisTemplate.expire(cartKey, 7, TimeUnit.DAYS);
+
+                    // 发送消息到MQ，异步更新数据库
+                    cartCacheService.sendCartUpdateMessage(userId);
+
+                    return Result.ok("移除成功");
                 }
             }
-            if (!found) {
-                return Result.fail("商品不存在");
-            }
 
-            // 清理空的商铺购物车
-            cartList.removeIf(shopCart -> shopCart.getItems().isEmpty());
-
-            // 更新Redis缓存
-            cartCacheService.updateCartCache(userId, cartList);
-
-            // 发送消息到MQ，异步更新数据库
-            cartCacheService.sendCartUpdateMessage(userId);
-
-            return Result.ok("移除购物车商品成功");
+            return Result.fail("商品不存在");
         } catch (Exception e) {
             log.error("移除购物车商品失败", e);
-            return Result.fail("移除购物车商品失败");
+            return Result.fail("移除失败");
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
@@ -383,18 +384,20 @@ public class CartItemServiceImpl implements ICartItemService {
                 return Result.fail("请求正在处理中，请稍后再试");
             }
 
-            List<ShopCartDTO> cartList = new ArrayList<>();
-
-            // 更新Redis缓存
-            cartCacheService.updateCartCache(userId, cartList);
+            // 从Redis获取购物车
+            String cartKey = CART_KEY_PREFIX + userId;
+            // 不删除key，只删除value
+            stringRedisTemplate.opsForHash().delete(cartKey);
+            // 过期时间
+            stringRedisTemplate.expire(cartKey, 7, TimeUnit.DAYS);
 
             // 发送消息到MQ，异步更新数据库
             cartCacheService.sendCartUpdateMessage(userId);
 
-            return Result.ok("购物车已清空");
+            return Result.ok("清空成功");
         } catch (Exception e) {
             log.error("清空购物车失败", e);
-            return Result.fail("清空购物车失败");
+            return Result.fail("清空失败");
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();

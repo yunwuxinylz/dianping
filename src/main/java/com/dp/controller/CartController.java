@@ -1,5 +1,7 @@
 package com.dp.controller;
 
+import java.util.List;
+
 import javax.annotation.Resource;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,17 +13,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.dp.dto.CartItemDTO;
+import com.dp.dto.CartAddDTO;
 import com.dp.dto.Result;
+import com.dp.dto.ShopCartDTO;
 import com.dp.service.ICartService;
 import com.dp.utils.UserHolder;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 购物车控制器
@@ -53,10 +56,10 @@ public class CartController {
     @Operation(summary = "添加商品到购物车", description = "将商品添加到当前用户的购物车")
     @ApiResponse(responseCode = "200", description = "添加成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result addToCart(
-            @Parameter(description = "购物车商品信息") @RequestBody CartItemDTO cartItemDTO) {
+            @Parameter(description = "购物车商品信息") @RequestBody CartAddDTO cartAddDTO) {
         // 获取当前用户
         Long userId = UserHolder.getUser().getId();
-        return cartService.addToCart(userId, cartItemDTO);
+        return cartService.addToCart(userId, cartAddDTO);
     }
 
     /**
@@ -66,12 +69,13 @@ public class CartController {
     @Operation(summary = "更新商品数量", description = "更新购物车中商品的数量")
     @ApiResponse(responseCode = "200", description = "更新成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result updateCartItemCount(
+            @Parameter(description = "店铺ID") @RequestParam("shopId") Long shopId,
             @Parameter(description = "商品ID") @RequestParam("goodsId") Long goodsId,
             @Parameter(description = "商品规格ID") @RequestParam(value = "skuId", required = false) Long skuId,
             @Parameter(description = "商品数量") @RequestParam("count") Integer count) {
         // 获取当前用户
         Long userId = UserHolder.getUser().getId();
-        return cartService.updateCartItemCount(userId, goodsId, skuId, count);
+        return cartService.updateCartItemCount(userId, shopId, goodsId, skuId, count);
     }
 
     /**
@@ -81,11 +85,12 @@ public class CartController {
     @Operation(summary = "移除购物车商品", description = "从购物车中移除指定商品")
     @ApiResponse(responseCode = "200", description = "移除成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result removeFromCart(
+            @Parameter(description = "店铺ID") @RequestParam("shopId") Long shopId,
             @Parameter(description = "商品ID") @RequestParam("goodsId") Long goodsId,
             @Parameter(description = "商品规格ID") @RequestParam(value = "skuId", required = false) Long skuId) {
         // 获取当前用户
         Long userId = UserHolder.getUser().getId();
-        return cartService.removeFromCart(userId, goodsId, skuId);
+        return cartService.removeFromCart(userId, shopId, goodsId, skuId);
     }
 
     /**
@@ -107,12 +112,13 @@ public class CartController {
     @Operation(summary = "选中/取消选中商品", description = "选中或取消选中购物车中的商品")
     @ApiResponse(responseCode = "200", description = "操作成功", content = @Content(schema = @Schema(implementation = Result.class)))
     public Result checkCartItem(
+            @Parameter(description = "店铺ID") @RequestParam("shopId") Long shopId,
             @Parameter(description = "商品ID") @RequestParam("goodsId") Long goodsId,
             @Parameter(description = "商品规格ID") @RequestParam(value = "skuId", required = false) Long skuId,
             @Parameter(description = "是否选中") @RequestParam("checked") Boolean checked) {
         // 获取当前用户
         Long userId = UserHolder.getUser().getId();
-        return cartService.checkCartItem(userId, goodsId, skuId, checked);
+        return cartService.checkCartItem(userId, shopId, goodsId, skuId, checked);
     }
 
     /**
@@ -152,5 +158,17 @@ public class CartController {
         // 获取当前用户
         Long userId = UserHolder.getUser().getId();
         return cartService.removeCheckedItems(userId);
+    }
+
+    /**
+     * 合并购物车
+     */
+    @PostMapping("/merge")
+    @Operation(summary = "合并购物车", description = "将游客购物车合并到当前用户的购物车")
+    @ApiResponse(responseCode = "200", description = "合并成功", content = @Content(schema = @Schema(implementation = Result.class)))
+    public Result mergeCart(@Parameter(description = "游客购物车数据") @RequestBody List<ShopCartDTO> guestCart) {
+        // 获取当前用户
+        Long userId = UserHolder.getUser().getId();
+        return cartService.mergeCart(userId, guestCart);
     }
 }

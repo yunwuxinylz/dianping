@@ -1,7 +1,10 @@
 package com.dp.service;
 
-import com.dp.dto.CartItemDTO;
+import java.util.List;
+
+import com.dp.dto.CartAddDTO;
 import com.dp.dto.Result;
+import com.dp.dto.ShopCartDTO;
 
 /**
  * 购物车服务接口
@@ -19,11 +22,11 @@ public interface ICartService {
     /**
      * 添加商品到购物车
      * 
-     * @param userId   用户ID
-     * @param cartItem 购物车项
+     * @param userId     用户ID
+     * @param cartAddDTO 购物车项
      * @return 是否添加成功
      */
-    Result addToCart(Long userId, CartItemDTO cartItem);
+    Result addToCart(Long userId, CartAddDTO cartAddDTO);
 
     /**
      * 更新购物车商品数量
@@ -34,7 +37,7 @@ public interface ICartService {
      * @param count   更新后的数量
      * @return 是否更新成功
      */
-    Result updateCartItemCount(Long userId, Long goodsId, Long skuId, Integer count);
+    Result updateCartItemCount(Long userId, Long shopId, Long goodsId, Long skuId, Integer count);
 
     /**
      * 移除购物车商品
@@ -44,7 +47,7 @@ public interface ICartService {
      * @param skuId   商品SKU ID
      * @return 是否移除成功
      */
-    Result removeFromCart(Long userId, Long goodsId, Long skuId);
+    Result removeFromCart(Long userId, Long shopId, Long goodsId, Long skuId);
 
     /**
      * 清空用户购物车
@@ -63,7 +66,7 @@ public interface ICartService {
      * @param checked 是否选中
      * @return 是否操作成功
      */
-    Result checkCartItem(Long userId, Long goodsId, Long skuId, Boolean checked);
+    Result checkCartItem(Long userId, Long shopId, Long goodsId, Long skuId, Boolean checked);
 
     /**
      * 全选或取消全选
@@ -91,4 +94,13 @@ public interface ICartService {
      * @return 是否移除成功
      */
     Result removeCheckedItems(Long userId);
+
+    /**
+     * 合并购物车
+     * 
+     * @param userId    用户ID
+     * @param guestCart 游客购物车数据
+     * @return 合并结果
+     */
+    Result mergeCart(Long userId, List<ShopCartDTO> guestCart);
 }

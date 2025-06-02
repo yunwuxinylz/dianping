@@ -1,9 +1,12 @@
 package com.dp.service.impl;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
-import com.dp.dto.CartItemDTO;
+import com.dp.dto.CartAddDTO;
 import com.dp.dto.Result;
+import com.dp.dto.ShopCartDTO;
 import com.dp.service.ICartCacheService;
 import com.dp.service.ICartItemService;
 import com.dp.service.ICartSelectionService;
@@ -42,24 +45,24 @@ public class CartServiceImpl implements ICartService {
      * 添加商品到购物车
      */
     @Override
-    public Result addToCart(Long userId, CartItemDTO cartItem) {
-        return cartItemService.addToCart(userId, cartItem);
+    public Result addToCart(Long userId, CartAddDTO cartAddDTO) {
+        return cartItemService.addToCart(userId, cartAddDTO);
     }
 
     /**
      * 更新购物车商品数量
      */
     @Override
-    public Result updateCartItemCount(Long userId, Long goodsId, Long skuId, Integer count) {
-        return cartItemService.updateCartItemCount(userId, goodsId, skuId, count);
+    public Result updateCartItemCount(Long userId, Long shopId, Long goodsId, Long skuId, Integer count) {
+        return cartItemService.updateCartItemCount(userId, shopId, goodsId, skuId, count);
     }
 
     /**
      * 移除购物车商品
      */
     @Override
-    public Result removeFromCart(Long userId, Long goodsId, Long skuId) {
-        return cartItemService.removeFromCart(userId, goodsId, skuId);
+    public Result removeFromCart(Long userId, Long shopId, Long goodsId, Long skuId) {
+        return cartItemService.removeFromCart(userId, shopId, goodsId, skuId);
     }
 
     /**
@@ -74,8 +77,8 @@ public class CartServiceImpl implements ICartService {
      * 选中或取消选中购物车商品
      */
     @Override
-    public Result checkCartItem(Long userId, Long goodsId, Long skuId, Boolean checked) {
-        return cartSelectionService.checkCartItem(userId, goodsId, skuId, checked);
+    public Result checkCartItem(Long userId, Long shopId, Long goodsId, Long skuId, Boolean checked) {
+        return cartSelectionService.checkCartItem(userId, shopId, goodsId, skuId, checked);
     }
 
     /**
@@ -102,4 +105,11 @@ public class CartServiceImpl implements ICartService {
         return cartSelectionService.removeCheckedItems(userId);
     }
 
+    /**
+     * 合并购物车
+     */
+    @Override
+    public Result mergeCart(Long userId, List<ShopCartDTO> guestCart) {
+        return cartItemService.mergeCart(userId, guestCart);
+    }
 }

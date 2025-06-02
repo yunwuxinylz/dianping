@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -77,12 +79,15 @@ public class CartCacheServiceImpl extends ServiceImpl<CartMapper, Cart> implemen
     public Result getUserCart(Long userId) {
         // 从Redis获取购物车(使用Hash结构)
         String cartKey = CART_KEY_PREFIX + userId;
-        Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
+        // 判断Redis中是否存在该key
+        boolean isExists = stringRedisTemplate.hasKey(cartKey);
 
-        if (entries.isEmpty()) {
-            // 如果Redis中没有数据，从数据库加载
+        if (!isExists) {
             return Result.ok(loadCartFromDB(userId));
         }
+
+        // 从Redis获取购物车数据
+        Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(cartKey);
 
         // 将Hash结构转换为购物车列表
         List<ShopCartDTO> cartList = convertHashToCartList(entries);
@@ -185,10 +190,6 @@ public class CartCacheServiceImpl extends ServiceImpl<CartMapper, Cart> implemen
                 Shop shop = getShopFromCache(shopId);
                 if (shop != null) {
                     newShopCart.setShopName(shop.getName());
-                    if (shop.getImages() != null) {
-                        List<String> imageList = Arrays.asList(shop.getImages().split(","));
-                        newShopCart.setShopImage(imageList);
-                    }
                 }
 
                 cartList.add(newShopCart);
@@ -210,44 +211,82 @@ public class CartCacheServiceImpl extends ServiceImpl<CartMapper, Cart> implemen
      * 预加载所有需要的数据，避免循环中多次查询
      */
     private void preloadCartData(List<Cart> carts) {
-        Set<Long> goodsIds = new HashSet<>();
-        Set<Long> skuIds = new HashSet<>();
+        // 1. 收集所有需要的IDs
+        Set<Long> goodsIds = carts.stream()
+                .map(Cart::getGoodsId)
+                .collect(Collectors.toSet());
 
-        // 收集所有需要的IDs
-        for (Cart cart : carts) {
-            goodsIds.add(cart.getGoodsId());
-            if (cart.getSkuId() != null) {
-                skuIds.add(cart.getSkuId());
+        Set<Long> skuIds = carts.stream()
+                .filter(cart -> cart.getSkuId() != null)
+                .map(Cart::getSkuId)
+                .collect(Collectors.toSet());
+
+        Set<Long> shopIds = new HashSet<>(); // 用于收集所有店铺ID
+
+        // 2. 批量加载商品并收集店铺ID
+        if (!goodsIds.isEmpty()) {
+            List<Goods> validGoods = goodsService.listByIds(goodsIds).stream()
+                    .filter(goods -> goods.getStatus() == 1)
+                    .peek(goods -> shopIds.add(goods.getShopId())) // 收集店铺ID
+                    .collect(Collectors.toList());
+
+            // 批量更新商品缓存
+            validGoods.forEach(goods -> goodsCache.put(goods.getId(), goods));
+        }
+
+        // 3. 批量加载店铺数据
+        if (!shopIds.isEmpty()) {
+            Map<Long, Shop> shops = shopService.listByIds(shopIds).stream()
+                    .collect(Collectors.toMap(Shop::getId, Function.identity()));
+
+            // 批量更新店铺缓存
+            shops.forEach(shopCache::put);
+        }
+
+        // 4. 批量加载SKU数据
+        if (!skuIds.isEmpty()) {
+            Map<Long, GoodSKU> skus = goodSkuService.listByIds(skuIds).stream()
+                    .collect(Collectors.toMap(GoodSKU::getId, Function.identity()));
+
+            // 批量更新SKU缓存
+            skus.forEach(skuCache::put);
+        }
+    }
+
+    // 从缓存获取Goods（优化版）
+    private Goods getGoodsFromCache(Long goodsId) {
+        Goods goods = goodsCache.get(goodsId);
+        if (goods == null) {
+            goods = goodsService.getById(goodsId);
+            if (goods != null && goods.getStatus() == 1) {
+                goodsCache.put(goodsId, goods);
             }
         }
-
-        // 批量加载商品
-        if (!goodsIds.isEmpty()) {
-            goodsService.listByIds(goodsIds).forEach(goods -> {
-                goodsCache.put(goods.getId(), goods);
-                shopCache.computeIfAbsent(goods.getShopId(), id -> shopService.getById(id));
-            });
-        }
-
-        // 批量加载SKU
-        if (!skuIds.isEmpty()) {
-            goodSkuService.listByIds(skuIds).forEach(sku -> skuCache.put(sku.getId(), sku));
-        }
+        return goods;
     }
 
-    // 从缓存获取Goods
-    private Goods getGoodsFromCache(Long goodsId) {
-        return goodsCache.computeIfAbsent(goodsId, id -> goodsService.getById(id));
-    }
-
-    // 从缓存获取Shop
+    // 从缓存获取Shop（优化版）
     private Shop getShopFromCache(Long shopId) {
-        return shopCache.computeIfAbsent(shopId, id -> shopService.getById(id));
+        Shop shop = shopCache.get(shopId);
+        if (shop == null) {
+            shop = shopService.getById(shopId);
+            if (shop != null) {
+                shopCache.put(shopId, shop);
+            }
+        }
+        return shop;
     }
 
-    // 从缓存获取SKU
+    // 从缓存获取SKU（优化版）
     private GoodSKU getSkuFromCache(Long skuId) {
-        return skuCache.computeIfAbsent(skuId, id -> goodSkuService.getById(id));
+        GoodSKU sku = skuCache.get(skuId);
+        if (sku == null) {
+            sku = goodSkuService.getById(skuId);
+            if (sku != null) {
+                skuCache.put(skuId, sku);
+            }
+        }
+        return sku;
     }
 
     // 创建购物车项DTO
@@ -260,7 +299,10 @@ public class CartCacheServiceImpl extends ServiceImpl<CartMapper, Cart> implemen
 
         // 设置商品信息
         item.setGoodsName(goods.getName());
-        item.setGoodsImages(goods.getImages());
+        if (goods.getImages() != null) {
+            List<String> imageList = Arrays.asList(goods.getImages().split(","));
+            item.setGoodsImages(imageList);
+        }
         item.setPrice(goods.getPrice());
 
         // 设置SKU信息

@@ -2,19 +2,19 @@ package com.dp.service;
 
 import java.util.List;
 
-import com.dp.dto.CartItemDTO;
+import com.dp.dto.CartAddDTO;
 import com.dp.dto.Result;
 import com.dp.dto.ShopCartDTO;
-import com.dp.entity.Goods;
 
 public interface ICartItemService {
-    Result addToCart(Long userId, CartItemDTO cartItem);
+    Result addToCart(Long userId, CartAddDTO cartAddDTO);
 
-    Result updateCartItemCount(Long userId, Long goodsId, Long skuId, Integer count);
+    Result mergeCart(Long userId, List<ShopCartDTO> guestCart);
 
-    Result removeFromCart(Long userId, Long goodsId, Long skuId);
+    Result updateCartItemCount(Long userId, Long shopId, Long goodsId, Long skuId, Integer count);
+
+    Result removeFromCart(Long userId, Long shopId, Long goodsId, Long skuId);
 
     Result clearCart(Long userId);
 
-    Boolean updateCartWithNewItem(List<ShopCartDTO> cartList, Goods goods, CartItemDTO cartItem);
 }

@@ -41,7 +41,7 @@ public class CartListener {
     /**
      * 监听购物车保存消息，将Redis中的购物车数据同步到数据库
      */
-    @RabbitListener(queues = "cart.save.queue", concurrency = "3")
+    @RabbitListener(queues = "cart.save.queue", ackMode = "MANUAL")
     public void listenCartSave(Long userId, Message message, Channel channel) throws IOException {
         // 创建分布式锁，确保同一用户的购物车同步是串行的
         RLock lock = redissonClient.getLock(CART_SYNC_LOCK_PREFIX + userId);

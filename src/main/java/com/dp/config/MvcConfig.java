@@ -22,7 +22,6 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/blog/hot",
                         "/user/code",
                         "/user/login",
-                        "/user/logout",
                         "/user/register",
                         "/user/reset-password",
                         "/user/refresh-token",
