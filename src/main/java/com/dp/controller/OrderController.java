@@ -57,7 +57,7 @@ public class OrderController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String statuses,
             @RequestParam(required = false) Boolean uncommented,
-            @RequestParam(required = false) Integer afterSaleStatus,
+            @RequestParam(required = false) Boolean afterSaleStatus,
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer pageSize) {
 

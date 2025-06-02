@@ -206,12 +206,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
 
         // 处理售后状态条件
-        if (queryDTO.getAfterSaleStatus() != null) {
-            wrapper.eq(Order::getAfterSaleStatus, queryDTO.getAfterSaleStatus());
+        if (Boolean.TRUE.equals(queryDTO.getAfterSaleStatus())) {
+            wrapper.eq(Order::getStatus, 5);
         }
 
-        // 按创建时间降序
-        wrapper.orderByDesc(Order::getCreateTime);
+        // 按更新时间降序
+        wrapper.orderByDesc(Order::getUpdateTime);
 
         // 创建分页对象并执行查询
         Page<Order> orderPage = page(new Page<>(queryDTO.getCurrent(), queryDTO.getPageSize()), wrapper);
