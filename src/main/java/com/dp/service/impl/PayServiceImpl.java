@@ -52,8 +52,9 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
             // 根据支付方式创建支付订单
             if (payType == 1) {
                 // 微信支付
-                String payUrl = createWechatOrder(orderId);
-                return Result.ok(payUrl);
+                // String payUrl = createWechatOrder(orderId);
+                Result result = createWechatOrder(orderId);
+                return Result.ok(result);
             } else if (payType == 2) {
                 // 支付宝支付
                 String payForm = createAlipayOrder(orderId);
@@ -115,7 +116,7 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
     }
 
     @Override
-    public String createWechatOrder(Long orderId) {
+    public Result createWechatOrder(Long orderId) {
         // 获取订单信息
         Order order = validateOrder(orderId);
 
@@ -123,10 +124,15 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
         log.info("创建微信支付订单: {}", orderId);
 
         // 模拟返回微信支付跳转URL
-        String returnUrl = "http://localhost:8081/pay/return/" + orderId + "?payType=1";
+        // String returnUrl = "http://localhost:8081/pay/return/" + orderId +
+        // "?payType=1";
+        boolean success = confirmOrderPayment(orderId, 1);
+        if (success) {
+            return Result.ok("success");
+        }
 
         // 在真实场景中，这里应该返回微信支付的二维码链接或跳转链接
-        return "https://wx.tenpay.com/mock-pay/" + orderId + "?redirect=" + returnUrl;
+        return Result.fail("fail");
     }
 
     @Override
@@ -322,7 +328,7 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
         // 实际项目中需要调用微信支付查询API
         log.info("模拟查询微信支付订单状态: {}", orderId);
         // 这里是模拟实现，实际项目中需要调用微信支付API
-        return false;
+        return true;
     }
 
     /**

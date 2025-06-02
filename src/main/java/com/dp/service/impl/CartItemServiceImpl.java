@@ -126,6 +126,7 @@ public class CartItemServiceImpl implements ICartItemService {
                 // 创建新的购物车
                 shopCart.setShopId(shopId);
                 shopCart.setShopName(cartAddDTO.getShopName());
+                shopCart.setShopImage(cartAddDTO.getShopImage());
                 shopCart.setItems(new ArrayList<>());
                 // 将CartAddDTO转换为CartItemDTO
                 CartItemDTO cartItem = BeanUtil.toBean(cartAddDTO, CartItemDTO.class);
@@ -212,6 +213,7 @@ public class CartItemServiceImpl implements ICartItemService {
                         cartAddDTO = BeanUtil.toBean(item, CartAddDTO.class);
                         cartAddDTO.setShopId(shopCart.getShopId());
                         cartAddDTO.setShopName(shopCart.getShopName());
+                        cartAddDTO.setShopImage(shopCart.getShopImage());
                         Result res = addToCart(userId, cartAddDTO);
                         if (res.getSuccess()) {
                             mergedCount.incrementAndGet();

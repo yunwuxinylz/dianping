@@ -58,4 +58,9 @@ public class CartAddDTO implements Serializable {
      */
     private String shopName;
 
+    /**
+     * 店铺图片
+     */
+    private List<String> shopImage;
+
 }

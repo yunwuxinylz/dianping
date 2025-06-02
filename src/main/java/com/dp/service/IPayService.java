@@ -21,7 +21,7 @@ public interface IPayService extends IService<Order> {
      * @param orderId 订单ID
      * @return 微信支付链接或二维码内容
      */
-    String createWechatOrder(Long orderId);
+    Result createWechatOrder(Long orderId);
 
     /**
      * 处理支付宝异步通知

@@ -154,4 +154,8 @@ public class PayController {
         return result.getSuccess() ? "<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>"
                 : "<xml><return_code><![CDATA[FAIL]]></return_code></xml>";
     }
+
+    /**
+     * 模拟普通支付
+     */
 }
