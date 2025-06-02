@@ -57,6 +57,7 @@ public class OrderController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String statuses,
             @RequestParam(required = false) Boolean uncommented,
+            @RequestParam(required = false) Integer afterSaleStatus,
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer pageSize) {
 
@@ -78,6 +79,9 @@ public class OrderController {
 
         // 处理未评价条件
         queryDTO.setUncommented(uncommented);
+
+        // 处理售后状态条件
+        queryDTO.setAfterSaleStatus(afterSaleStatus);
 
         return orderService.getOrderList(queryDTO);
     }

@@ -23,5 +23,6 @@ public class OrderListDTO {
     private Integer status;
     private LocalDateTime createTime;
     private boolean commented;
+    private Integer afterSaleStatus;
 
 }

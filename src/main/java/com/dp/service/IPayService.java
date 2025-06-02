@@ -65,4 +65,13 @@ public interface IPayService extends IService<Order> {
      * @return 支付状态结果
      */
     Result queryPaymentStatus(Long orderId, Integer payType);
+
+    /**
+     * 订单退款
+     * 
+     * @param orderId 订单ID
+     * @param amount  退款金额（分）
+     * @return 是否成功
+     */
+    boolean refund(Long orderId, Long amount);
 }

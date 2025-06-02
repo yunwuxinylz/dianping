@@ -9,6 +9,7 @@ public class OrderQueryDTO {
     private Integer status;
     private List<Integer> statusList;
     private Boolean uncommented;
+    private Integer afterSaleStatus;
     private Integer current = 1;
     private Integer pageSize = 10;
 }

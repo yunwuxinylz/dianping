@@ -112,7 +112,8 @@ public class PayController {
 
         // 前端地址，确保使用正确的前端地址
         String frontendUrl = "http://localhost:3000/#/order/result?orderId=" + orderId +
-                "&payResult=" + (isPaid ? "success" : "pending");
+                "&payResult=" + (isPaid ? "success" : "pending") +
+                "&payType=" + payType;
 
         // 重定向到前端结果页面
         try {

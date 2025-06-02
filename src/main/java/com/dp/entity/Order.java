@@ -1,14 +1,16 @@
 package com.dp.entity;
 
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
-
-import java.io.Serializable;
-import java.time.LocalDateTime;
 
 /**
  * 订单实体类
@@ -95,6 +97,12 @@ public class Order implements Serializable {
      * 是否评价
      */
     private Boolean commented;
+
+    /**
+     * 售后状态
+     */
+    @TableField("after_sale_status")
+    private Integer afterSaleStatus;
 
     /**
      * 取消原因

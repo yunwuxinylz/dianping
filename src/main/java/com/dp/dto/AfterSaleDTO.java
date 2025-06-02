@@ -5,7 +5,7 @@ import java.util.List;
 
 @Data
 public class AfterSaleDTO {
-    private Long orderId;
+    private String orderId;
     private Integer type;
     private String reason;
     private Long amount;

@@ -205,6 +205,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             wrapper.eq(Order::getCommented, false); // 未评价
         }
 
+        // 处理售后状态条件
+        if (queryDTO.getAfterSaleStatus() != null) {
+            wrapper.eq(Order::getAfterSaleStatus, queryDTO.getAfterSaleStatus());
+        }
+
         // 按创建时间降序
         wrapper.orderByDesc(Order::getCreateTime);
 

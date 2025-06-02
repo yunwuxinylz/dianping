@@ -15,7 +15,9 @@ import com.alipay.api.DefaultAlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.alipay.api.request.AlipayTradeQueryRequest;
+import com.alipay.api.request.AlipayTradeRefundRequest;
 import com.alipay.api.response.AlipayTradeQueryResponse;
+import com.alipay.api.response.AlipayTradeRefundResponse;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dp.config.AlipayConfig;
 import com.dp.dto.Result;
@@ -271,6 +273,9 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
             }
 
             if (isPaid) {
+                if (order.getStatus() == 2) {
+                    return Result.ok(true);
+                }
                 // 更新订单状态
                 confirmOrderPayment(orderId, payType);
                 return Result.ok(true);
@@ -348,5 +353,109 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
         }
 
         return order;
+    }
+
+    @Override
+    public boolean refund(Long orderId, Long amount) {
+        try {
+            // 查询订单
+            Order order = this.getById(orderId);
+            if (order == null) {
+                log.warn("退款失败：订单[{}]不存在", orderId);
+                return false;
+            }
+
+            // 校验订单状态
+            if (order.getStatus() < 2) {
+                log.warn("退款失败：订单[{}]未支付", orderId);
+                return false;
+            }
+
+            // 校验退款金额
+            if (amount > order.getAmount()) {
+                log.warn("退款失败：退款金额[{}]大于订单金额[{}]", amount, order.getAmount());
+                return false;
+            }
+
+            // 根据支付方式进行退款
+            Integer payType = order.getPayType();
+            if (payType == 2) {
+                // 支付宝退款
+                return refundByAlipay(orderId, amount);
+            } else if (payType == 1) {
+                // 微信退款
+                return refundByWechat(orderId, amount);
+            } else {
+                log.warn("退款失败：不支持的支付方式[{}]", payType);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("退款失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 支付宝退款
+     * 
+     * @param orderId 订单ID
+     * @param amount  退款金额
+     * @return 是否成功
+     */
+    private boolean refundByAlipay(Long orderId, Long amount) {
+        try {
+            // 创建支付宝客户端
+            AlipayClient alipayClient = new DefaultAlipayClient(
+                    alipayConfig.getGateway(),
+                    alipayConfig.getAppId(),
+                    alipayConfig.getPrivateKey(),
+                    alipayConfig.getFormat(),
+                    alipayConfig.getCharset(),
+                    alipayConfig.getPublicKey(),
+                    alipayConfig.getSignType());
+
+            // 创建退款请求
+            AlipayTradeRefundRequest request = new AlipayTradeRefundRequest();
+
+            // 转换金额为元
+            BigDecimal refundAmount = new BigDecimal(amount).divide(new BigDecimal("100"));
+
+            // 构建业务参数
+            String bizContent = "{" +
+                    "\"out_trade_no\":\"" + orderId + "\"," +
+                    "\"refund_amount\":\"" + refundAmount.toString() + "\"," +
+                    "\"refund_reason\":\"商品退款\"" +
+                    "}";
+            request.setBizContent(bizContent);
+
+            // 执行退款
+            AlipayTradeRefundResponse response = alipayClient.execute(request);
+            if (response.isSuccess()) {
+                log.info("支付宝退款成功：订单[{}]，金额[{}]", orderId, amount);
+                return true;
+            } else {
+                log.warn("支付宝退款失败：订单[{}]，错误码[{}]，错误信息[{}]",
+                        orderId, response.getCode(), response.getMsg());
+                return false;
+            }
+        } catch (AlipayApiException e) {
+            log.error("支付宝退款异常", e);
+            return false;
+        }
+    }
+
+    /**
+     * 微信退款
+     * 
+     * @param orderId 订单ID
+     * @param amount  退款金额
+     * @return 是否成功
+     */
+    private boolean refundByWechat(Long orderId, Long amount) {
+        // 在实际项目中，需要调用微信支付退款接口
+        log.info("模拟微信退款：订单[{}]，金额[{}]", orderId, amount);
+
+        // 这里是模拟实现，实际项目中需要集成微信支付SDK进行退款
+        return true;
     }
 }
