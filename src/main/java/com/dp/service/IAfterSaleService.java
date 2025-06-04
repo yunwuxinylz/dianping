@@ -43,7 +43,7 @@ public interface IAfterSaleService extends IService<AfterSale> {
      * @param status  售后状态（可选）
      * @return 售后列表
      */
-    Result getUserAfterSales(Integer current, Integer size, Integer status);
+    // Result getUserAfterSales(Integer current, Integer size, Integer status);
 
     /**
      * 商家处理售后
@@ -52,14 +52,6 @@ public interface IAfterSaleService extends IService<AfterSale> {
      * @return 处理结果
      */
     Result handleAfterSale(AfterSaleStatusDTO afterSaleStatusDTO);
-
-    /**
-     * 退款操作
-     * 
-     * @param id 售后ID
-     * @return 退款结果
-     */
-    Result refund(Long id);
 
     /**
      * 查询全部售后申请（管理员）

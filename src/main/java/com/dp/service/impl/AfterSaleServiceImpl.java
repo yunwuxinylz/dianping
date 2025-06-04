@@ -87,7 +87,7 @@ public class AfterSaleServiceImpl extends ServiceImpl<AfterSaleMapper, AfterSale
             afterSale.setImages(images);
         }
 
-        // 设置初始状态为待处理
+        // 设置初始状态为处理中
         afterSale.setStatus(1);
         afterSale.setCreateTime(LocalDateTime.now());
         afterSale.setUpdateTime(LocalDateTime.now());
@@ -174,35 +174,38 @@ public class AfterSaleServiceImpl extends ServiceImpl<AfterSaleMapper, AfterSale
         return Result.ok(afterSaleDTOs);
     }
 
-    @Override
-    public Result getUserAfterSales(Integer current, Integer size, Integer status) {
-        // 获取当前用户
-        UserDTO user = UserHolder.getUser();
-        Long userId = user.getId();
+    // @Override
+    // public Result getUserAfterSales(Integer current, Integer size, Integer
+    // status) {
+    // // 获取当前用户
+    // UserDTO user = UserHolder.getUser();
+    // Long userId = user.getId();
 
-        // 构建查询条件
-        Page<AfterSale> page = this.lambdaQuery()
-                .eq(AfterSale::getUserId, userId)
-                .eq(status != null, AfterSale::getStatus, status)
-                .orderByDesc(AfterSale::getCreateTime)
-                .page(new Page<>(current, size));
+    // // 构建查询条件
+    // Page<AfterSale> page = this.lambdaQuery()
+    // .eq(AfterSale::getUserId, userId)
+    // .eq(status != null, AfterSale::getStatus, status)
+    // .orderByDesc(AfterSale::getCreateTime)
+    // .page(new Page<>(current, size));
 
-        // 转换为DTO
-        List<AfterSaleDTO> records = page.getRecords().stream()
-                .map(afterSale -> {
-                    AfterSaleDTO dto = BeanUtil.copyProperties(afterSale, AfterSaleDTO.class);
-                    dto.setOrderId(afterSale.getOrderId().toString());
-                    // 处理图片
-                    if (StrUtil.isNotBlank(afterSale.getImages())) {
-                        List<String> imageList = Arrays.asList(afterSale.getImages().split(","));
-                        dto.setImages(imageList);
-                    }
-                    return dto;
-                })
-                .collect(Collectors.toList());
+    // // 转换为DTO
+    // List<AfterSaleDTO> records = page.getRecords().stream()
+    // .map(afterSale -> {
+    // AfterSaleDTO dto = BeanUtil.copyProperties(afterSale, AfterSaleDTO.class);
+    // dto.setOrderId(afterSale.getOrderId().toString());
+    // // 处理图片
+    // if (StrUtil.isNotBlank(afterSale.getImages())) {
+    // List<String> imageList = Arrays.asList(afterSale.getImages().split(","));
+    // dto.setImages(imageList);
+    // }
+    // return dto;
+    // })
+    // .collect(Collectors.toList());
 
-        return Result.ok(records, page.getTotal());
-    }
+    // return Result.ok(records, page.getTotal());
+    // }
+
+    // TODO: 有问题待解决
 
     @Override
     @Transactional
@@ -214,87 +217,68 @@ public class AfterSaleServiceImpl extends ServiceImpl<AfterSaleMapper, AfterSale
             return Result.fail("无权操作");
         }
 
-        // 获取售后记录
-        Long id = afterSaleStatusDTO.getId();
-        AfterSale afterSale = this.getById(id);
-        if (afterSale == null) {
-            return Result.fail("售后记录不存在");
-        }
-
-        // 只能处理待处理状态的售后申请
-        if (afterSale.getStatus() != 1) {
-            return Result.fail("该售后申请已被处理");
-        }
-
-        // 更新售后状态
-        Integer status = afterSaleStatusDTO.getStatus();
-        afterSale.setStatus(status);
-        afterSale.setHandleMsg(afterSaleStatusDTO.getHandleMsg());
-        afterSale.setHandleTime(LocalDateTime.now());
-        afterSale.setUpdateTime(LocalDateTime.now());
-        this.updateById(afterSale);
-
-        // 更新订单售后状态
-        orderService.update()
-                .set("after_sale_status", status)
-                .eq("id", afterSale.getOrderId())
-                .update();
-
-        // 如果是同意售后并且是退款，则进行退款操作
-        if (status == 1 && afterSale.getType() == 4) {
-            return this.refund(id);
-        }
-
-        return Result.ok();
-    }
-
-    @Override
-    @Transactional
-    public Result refund(Long id) {
-        // 获取售后记录
-        AfterSale afterSale = this.getById(id);
-        if (afterSale == null) {
-            return Result.fail("售后记录不存在");
-        }
-
-        // 获取订单信息
-        Long orderId = afterSale.getOrderId();
-        Order order = orderService.getById(orderId);
-        if (order == null) {
-            return Result.fail("订单不存在");
-        }
-
         try {
-            // 调用支付宝退款接口
-            boolean refundResult = payService.refund(orderId, afterSale.getAmount());
+            // 获取售后记录
+            Long id = afterSaleStatusDTO.getId();
+            Long orderId = Long.parseLong(afterSaleStatusDTO.getOrderId());
+            Long amount = afterSaleStatusDTO.getAmount();
 
-            if (!refundResult) {
-                return Result.fail("退款失败，请稍后再试");
+            // 开始事务处理
+            Integer type = afterSaleStatusDTO.getType();
+            boolean refundResult = true;
+
+            if (afterSaleStatusDTO.getStatus() == 2) { // 只有同意才处理退款
+                if (type == 1 || type == 4) {
+                    // TODO: 退款
+                    refundResult = payService.refund(orderId, amount);
+                    if (!refundResult) {
+                        return Result.fail("退款处理失败，请稍后重试");
+                    }
+                }
             }
 
             // 更新售后状态
-            afterSale.setStatus(2);
-            afterSale.setUpdateTime(LocalDateTime.now());
-            this.updateById(afterSale);
+            Integer status = afterSaleStatusDTO.getStatus();
+            boolean success1 = this.update()
+                    .set("status", status)
+                    .set("handle_msg", afterSaleStatusDTO.getHandleMsg())
+                    .set("handle_time", LocalDateTime.now())
+                    .set("update_time", LocalDateTime.now())
+                    .eq("id", id)
+                    .eq("status", 1)
+                    .update();
+            if (!success1) {
+                return Result.fail("更新售后状态失败");
+            }
 
             // 更新订单售后状态
-            orderService.update()
-                    .set("after_sale_status", 2)
-                    .eq("id", orderId)
-                    .update();
-
-            // 扣除订单金额（部分退款）
-            if (afterSale.getAmount() < order.getAmount()) {
-                orderService.update()
-                        .set("amount", order.getAmount() - afterSale.getAmount())
+            boolean success;
+            if (status == 2 && (type == 1 || type == 4)) {
+                // 同意退款
+                success = orderService.update()
+                        .set("after_sale_status", status)
+                        .setSql("amount = amount - " + amount)
                         .eq("id", orderId)
+                        .eq("after_sale_status", 1)
+                        .ge("amount", amount)
+                        .update();
+            } else {
+                // 拒绝退款或其他类型的售后
+                success = orderService.update()
+                        .set("after_sale_status", status)
+                        .eq("id", orderId)
+                        .eq("after_sale_status", 1)
                         .update();
             }
 
-            return Result.ok("退款成功");
+            if (!success) {
+                return Result.fail("更新订单售后状态失败");
+            }
+
+            return Result.ok("售后处理成功");
         } catch (Exception e) {
-            log.error("退款失败", e);
-            return Result.fail("退款失败：" + e.getMessage());
+            log.error("售后处理失败", e);
+            return Result.fail("售后处理失败: " + e.getMessage());
         }
     }
 

@@ -54,24 +54,24 @@ public class AfterSaleController {
     /**
      * 获取用户的售后记录列表
      */
-    @GetMapping("/user/list")
-    public Result getUserAfterSales(
-            @RequestParam(defaultValue = "1") Integer current,
-            @RequestParam(defaultValue = "10") Integer size,
-            @RequestParam(required = false) Integer status) {
-        return afterSaleService.getUserAfterSales(current, size, status);
-    }
+    // @GetMapping("/user/list")
+    // public Result getUserAfterSales(
+    // @RequestParam(defaultValue = "1") Integer current,
+    // @RequestParam(defaultValue = "10") Integer size,
+    // @RequestParam(required = false) Integer status) {
+    // return afterSaleService.getUserAfterSales(current, size, status);
+    // }
 
     /**
-     * 商家处理售后
+     * 管理员处理售后
      */
-    @PutMapping("/handle")
+    @PutMapping("/admin/handle")
     public Result handleAfterSale(@RequestBody AfterSaleStatusDTO afterSaleStatusDTO) {
         return afterSaleService.handleAfterSale(afterSaleStatusDTO);
     }
 
     /**
-     * 管理员查询全部售后记录
+     * 管理员查询全部未处理售后记录
      */
     @GetMapping("/admin/list")
     public Result getAllAfterSales(

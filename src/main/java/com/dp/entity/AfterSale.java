@@ -19,12 +19,12 @@ public class AfterSale implements Serializable {
     private Long orderId;
     private Long userId;
     private Long shopId;
-    private Integer type;
+    private Integer type; // 1-退货退款 2-换货 3-维修 4-仅退款
     private String reason;
     private Long amount;
     private String description;
     private String images;
-    private Integer status;
+    private Integer status; // 1-处理中 2-已完成 3-已拒绝
     private String handleMsg;
     private LocalDateTime handleTime;
     private LocalDateTime createTime;

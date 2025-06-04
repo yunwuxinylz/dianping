@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,9 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
     private final IGoodSKUService goodSKUService;
     private final IOrderItemsService orderItemsService;
     private final StringRedisTemplate stringRedisTemplate;
+
+    @Value("${spring.profiles.active:prod}")
+    private String activeProfile;
 
     @Override
     public Result processPayment(Long orderId, Integer payType) {
@@ -121,7 +125,7 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
         Order order = validateOrder(orderId);
 
         // 这里是微信支付的模拟实现，实际项目中需要集成微信支付SDK
-        log.info("创建微信支付订单: {}", orderId);
+        log.info("创建微信支付订单: {}", order);
 
         // 模拟返回微信支付跳转URL
         // String returnUrl = "http://localhost:8081/pay/return/" + orderId +
@@ -372,7 +376,7 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
             }
 
             // 校验订单状态
-            if (order.getStatus() < 2) {
+            if (order.getStatus() == 1) {
                 log.warn("退款失败：订单[{}]未支付", orderId);
                 return false;
             }
@@ -385,6 +389,7 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
 
             // 根据支付方式进行退款
             Integer payType = order.getPayType();
+
             if (payType == 2) {
                 // 支付宝退款
                 return refundByAlipay(orderId, amount);
@@ -439,11 +444,8 @@ public class PayServiceImpl extends ServiceImpl<OrderMapper, Order> implements I
             if (response.isSuccess()) {
                 log.info("支付宝退款成功：订单[{}]，金额[{}]", orderId, amount);
                 return true;
-            } else {
-                log.warn("支付宝退款失败：订单[{}]，错误码[{}]，错误信息[{}]",
-                        orderId, response.getCode(), response.getMsg());
-                return false;
             }
+            return false;
         } catch (AlipayApiException e) {
             log.error("支付宝退款异常", e);
             return false;
