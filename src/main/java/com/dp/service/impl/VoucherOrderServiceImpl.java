@@ -64,6 +64,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     public Result seckillVoucher(Long voucherId) {
 
         Long userId = UserHolder.getUser().getId();
+        if (userId == null) {
+            return Result.fail("用户未登录");
+        }
 
         Long result = stringRedisTemplate.execute(
                 SECKILL_SCRIPT,

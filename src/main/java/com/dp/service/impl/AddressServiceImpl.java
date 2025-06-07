@@ -42,7 +42,8 @@ public class AddressServiceImpl extends ServiceImpl<AddressMapper, Address> impl
         // 查询用户的所有地址
         List<Address> addresses = lambdaQuery()
                 .eq(Address::getUserId, user.getId())
-                .orderByDesc(Address::getIsDefault, Address::getCreatedAt)
+                .orderByDesc(Address::getIsDefault)
+                .orderByAsc(Address::getCreatedAt)
                 .list();
 
         // DTO转换
